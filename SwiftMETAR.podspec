@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'SwiftMETAR'
-  s.version          = '0.1.0'
+  s.version          = '0.1.1'
   s.summary          = 'A METAR parser written in Swift'
   s.homepage         = 'https://github.com/JonathanDowning/SwiftMETAR'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
