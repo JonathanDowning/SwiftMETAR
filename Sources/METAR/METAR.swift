@@ -65,7 +65,7 @@ extension METAR {
         
         let ceiling = cloudLayers
             .filter { $0.coverage == .overcast || $0.coverage == .skyObscured || $0.coverage == .broken }
-            .flatMap { $0.height?.measurement.converted(to: .feet).value }
+            .compactMap { $0.height?.measurement.converted(to: .feet).value }
             .sorted()
             .first ?? .greatestFiniteMagnitude
         
@@ -342,7 +342,7 @@ extension METAR {
             
             skyCondition = nil
             
-            cloudLayers = cloudLayerMatches.flatMap { match in
+            cloudLayers = cloudLayerMatches.compactMap { match in
                 
                 guard let typeRange = match[1] else {
                     return nil
@@ -485,7 +485,7 @@ extension METAR {
                 modifier = .moderate
             }
             
-            let weatherStrings: [String] = match.suffix(from: 2).flatMap {
+            let weatherStrings: [String] = match.suffix(from: 2).compactMap {
                 if let weatherStringRange = $0 {
                     return String(metar[weatherStringRange])
                 } else {
@@ -494,7 +494,7 @@ extension METAR {
             }
             
             let parseWeatherStrings = { (strings: [String]) -> [Weather.Phenomena]? in
-                let phenomena = strings.flatMap { Weather.Phenomena(rawValue: $0) }
+                let phenomena = strings.compactMap { Weather.Phenomena(rawValue: $0) }
                 
                 if phenomena.count != strings.count {
                     return nil
