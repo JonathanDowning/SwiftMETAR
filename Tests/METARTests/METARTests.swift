@@ -25,7 +25,7 @@ class METARTests: XCTestCase {
             militaryColourCode: .blue,
             temperature: Temperature(value: 22, unit: .celsius),
             dewPoint: Temperature(value: 20, unit: .celsius),
-            relativeHumidity: 1,
+            relativeHumidity: 0.88436416127981798,
             ceilingAndVisibilityOK: false,
             automaticStation: true,
             correction: true,
@@ -33,6 +33,35 @@ class METARTests: XCTestCase {
             remarks: "AO2 SLP166 60000 T02170200 10222 20206 53022",
             metarString: metarString,
             flightRules: .vfr
+        )
+        
+        XCTAssertEqual(metar, testMETAR)
+    }
+    
+    func testSlashesInBetweenCloudTypeAndHeight() {
+        let metarString = "EGGD 251250Z AUTO 25016G27KT 220V280 9999 BKN019///TCU 11/11 Q1013"
+        let metar = METAR(rawMETAR: metarString)
+        let testMETAR = METAR(
+            identifier: "EGGD",
+            date: date(day: 25, hour: 12, minute: 50),
+            wind: Wind(direction: 250, speed: Wind.Speed(value: 16, unit: .knots), gustSpeed: Wind.Speed(value: 27, unit: .knots), variation: Wind.Variation(from: 220, to: 280)),
+            qnh: QNH(value: 1013, unit: .hectopascals),
+            skyCondition: nil,
+            cloudLayers: [CloudLayer(coverage: .broken, height: CloudLayer.Height(value: 1900, unit: .feet), significantCloudType: .toweringCumulus)],
+            visibility: Visibility(value: 10, unit: .kilometers, greaterThanOrEqual: true),
+            weather: [],
+            trends: [],
+            militaryColourCode: nil,
+            temperature: Temperature(value: 11, unit: .celsius),
+            dewPoint: Temperature(value: 11, unit: .celsius),
+            relativeHumidity: 1,
+            ceilingAndVisibilityOK: false,
+            automaticStation: true,
+            correction: false,
+            noSignificantChangesExpected: false,
+            remarks: nil,
+            metarString: metarString,
+            flightRules: .mvfr
         )
         
         XCTAssertEqual(metar, testMETAR)

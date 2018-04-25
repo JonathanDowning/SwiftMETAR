@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct METAR: Codable {
+public struct METAR: Codable, Equatable {
     
     public let identifier: String
     public let date: Date
@@ -29,30 +29,6 @@ public struct METAR: Codable {
     public let remarks: String?
     public let metarString: String
     public let flightRules: NOAAFlightRules?
-    
-}
-
-extension METAR: Equatable {
-    
-    public static func == (lhs: METAR, rhs: METAR) -> Bool {
-        return lhs.identifier == rhs.identifier &&
-            lhs.date == rhs.date &&
-            lhs.metarString == rhs.metarString &&
-            lhs.wind == rhs.wind &&
-            lhs.qnh == rhs.qnh &&
-            lhs.skyCondition == rhs.skyCondition &&
-            lhs.visibility == rhs.visibility &&
-            lhs.weather == rhs.weather &&
-            lhs.trends == rhs.trends &&
-            lhs.militaryColourCode == rhs.militaryColourCode &&
-            lhs.temperature == rhs.temperature &&
-            lhs.dewPoint == rhs.dewPoint &&
-            lhs.automaticStation == rhs.automaticStation &&
-            lhs.noSignificantChangesExpected == rhs.noSignificantChangesExpected &&
-            lhs.correction == rhs.correction &&
-            lhs.remarks == rhs.remarks &&
-            lhs.flightRules == rhs.flightRules
-    }
     
 }
 
@@ -115,7 +91,7 @@ extension METAR {
         guard let correctionRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)COR\\b") else { return nil }
         guard let windRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{3}|VRB)([0-9]{2})(?:G([0-9]{2}))?(KT|MPS|KPH)(?: ([0-9]{3})V([0-9]{3}))?\\b") else { return nil }
         guard let cloudsRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(SKC|CLR|NSC|NCD)\\b") else { return nil }
-        guard let cloudLayerRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(FEW|SCT|BKN|OVC|VV|///)([0-9]{3}|///)(CB|TCU|///)?") else { return nil }
+        guard let cloudLayerRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(FEW|SCT|BKN|OVC|VV|///)([0-9]{3}|///)(?:///)?(CB|TCU|///)?") else { return nil }
         guard let temperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/(M)?([0-9]{2})\\b") else { return nil }
         guard let malformedTemperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/ ") else { return nil }
         guard let visibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(CAVOK|[0-9]{4})(NDV)?\\b") else { return nil }
@@ -558,10 +534,6 @@ public struct QNH: Equatable, Codable {
         }
     }
     
-    public static func == (lhs: QNH, rhs: QNH) -> Bool {
-        return lhs.measurement == rhs.measurement
-    }
-    
 }
 
 public struct Temperature: Equatable, Codable {
@@ -580,10 +552,6 @@ public struct Temperature: Equatable, Codable {
         }
     }
     
-    public static func == (lhs: Temperature, rhs: Temperature) -> Bool {
-        return lhs.measurement == rhs.measurement
-    }
-    
 }
 
 public struct Visibility: Equatable, Codable {
@@ -598,10 +566,6 @@ public struct Visibility: Equatable, Codable {
     public let unit: Unit
     public let greaterThanOrEqual: Bool
     
-    public static func == (lhs: Visibility, rhs: Visibility) -> Bool {
-        return lhs.measurement == rhs.measurement && lhs.greaterThanOrEqual == rhs.greaterThanOrEqual
-    }
-    
     public var measurement: Measurement<UnitLength> {
         switch unit {
         case .kilometers:
@@ -615,9 +579,9 @@ public struct Visibility: Equatable, Codable {
     
 }
 
-public struct Wind: Equatable, Codable {
+public struct Wind: Codable, Equatable {
     
-    public struct Speed: Codable {
+    public struct Speed: Codable, Equatable {
         
         public enum Unit: String, Codable {
             case knots
@@ -627,10 +591,6 @@ public struct Wind: Equatable, Codable {
         
         public let value: Double
         public let unit: Unit
-        
-        public static func == (lhs: Speed, rhs: Speed) -> Bool {
-            return lhs.measurement == rhs.measurement
-        }
         
         public var measurement: Measurement<UnitSpeed> {
             switch unit {
@@ -653,21 +613,8 @@ public struct Wind: Equatable, Codable {
     public let variation: Variation?
     
     public struct Variation: Equatable, Codable {
-        
         public let from: Degrees
         public let to: Degrees
-        
-        public static func == (lhs: Wind.Variation, rhs: Wind.Variation) -> Bool {
-            return lhs.from == rhs.from && lhs.to == rhs.to
-        }
-        
-    }
-    
-    public static func == (lhs: Wind, rhs: Wind) -> Bool {
-        return lhs.direction == rhs.direction &&
-            lhs.speed == rhs.speed &&
-            lhs.gustSpeed?.measurement == rhs.gustSpeed?.measurement &&
-            lhs.variation == rhs.variation
     }
     
 }
@@ -697,10 +644,6 @@ public struct CloudLayer: Equatable, Codable {
             }
         }
         
-        public static func == (lhs: Height, rhs: Height) -> Bool {
-            return lhs.measurement == rhs.measurement
-        }
-        
     }
     
     public let coverage: Coverage
@@ -713,10 +656,6 @@ public struct CloudLayer: Equatable, Codable {
     
     public enum SignificantCloudType: String, Codable {
         case cumulonimbus, toweringCumulus
-    }
-    
-    public static func == (lhs: CloudLayer, rhs: CloudLayer) -> Bool {
-        return lhs.coverage == rhs.coverage && lhs.height?.measurement == rhs.height?.measurement && lhs.significantCloudType == rhs.significantCloudType
     }
     
 }
@@ -767,10 +706,6 @@ public struct Weather: Equatable, Codable {
         case wellDevelopedDustWhirls = "PO"
     }
     
-    public static func == (lhs: Weather, rhs: Weather) -> Bool {
-        return lhs.modifier == rhs.modifier && lhs.phenomena == rhs.phenomena
-    }
-    
 }
 
 public enum MilitaryColourCode: String, Codable {
@@ -783,7 +718,7 @@ public enum MilitaryColourCode: String, Codable {
     case red
 }
 
-public struct Forecast: Equatable, Codable {
+public struct Forecast: Codable, Equatable {
     
     public enum `Type`: String, Codable {
         case becoming = "BECMG", temporaryForecast = "TEMPO"
@@ -791,10 +726,6 @@ public struct Forecast: Equatable, Codable {
     
     public let metarRepresentation: METAR
     public let type: Type
-    
-    public static func == (lhs: Forecast, rhs: Forecast) -> Bool {
-        return lhs.metarRepresentation == rhs.metarRepresentation && lhs.type == rhs.type
-    }
     
 }
 
