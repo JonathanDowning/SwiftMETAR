@@ -9,35 +9,35 @@ class METARTests: XCTestCase {
         XCTAssertNil(metar)
     }
     
-     func testSimpleMETAR() {
-     let metarString = "KRDU COR 281151Z AUTO 22007KT 9SM SCT040TCU FEW080 FEW250 22/20 SHRA BLU A3004 NOSIG RMK AO2 SLP166 60000 T02170200 10222 20206 53022"
-     let metar = METAR(rawMETAR: metarString)
-     let testMETAR = METAR(
-     identifier: "KRDU",
-     date: date(day: 28, hour: 11, minute: 51),
-     wind: Wind(direction: 220, speed: Wind.Speed(value: 7, unit: .knots), gustSpeed: nil, variation: nil),
-     qnh: QNH(value: 30.04, unit: .inchesOfMercury),
-     skyCondition: nil,
-     cloudLayers: [CloudLayer(coverage: .scattered, height: CloudLayer.Height(value: 4000, unit: .feet), significantCloudType: .toweringCumulus), CloudLayer(coverage: .few, height: CloudLayer.Height(value: 8000, unit: .feet), significantCloudType: nil), CloudLayer(coverage: .few, height: CloudLayer.Height(value: 25000, unit: .feet), significantCloudType: nil)],
-     visibility: Visibility(value: 9, unit: .miles, greaterThanOrEqual: false),
-     weather: [Weather(modifier: .moderate, phenomena: [.showers, .rain])],
-     trends: [],
-     militaryColourCode: .blue,
-     temperature: Temperature(value: 22, unit: .celsius),
-     dewPoint: Temperature(value: 20, unit: .celsius),
-     relativeHumidity: 1,
-     ceilingAndVisibilityOK: false,
-     automaticStation: true,
-     correction: true,
-     noSignificantChangesExpected: true,
-     remarks: "AO2 SLP166 60000 T02170200 10222 20206 53022",
-     metarString: metarString,
-     flightRules: .vfr
-     )
-     
-     XCTAssertEqual(metar, testMETAR)
-     }
- 
+    func testSimpleMETAR() {
+        let metarString = "KRDU COR 281151Z AUTO 22007KT 9SM SCT040TCU FEW080 FEW250 22/20 SHRA BLU A3004 NOSIG RMK AO2 SLP166 60000 T02170200 10222 20206 53022"
+        let metar = METAR(rawMETAR: metarString)
+        let testMETAR = METAR(
+            identifier: "KRDU",
+            date: date(day: 28, hour: 11, minute: 51),
+            wind: Wind(direction: 220, speed: Wind.Speed(value: 7, unit: .knots), gustSpeed: nil, variation: nil),
+            qnh: QNH(value: 30.04, unit: .inchesOfMercury),
+            skyCondition: nil,
+            cloudLayers: [CloudLayer(coverage: .scattered, height: CloudLayer.Height(value: 4000, unit: .feet), significantCloudType: .toweringCumulus), CloudLayer(coverage: .few, height: CloudLayer.Height(value: 8000, unit: .feet), significantCloudType: nil), CloudLayer(coverage: .few, height: CloudLayer.Height(value: 25000, unit: .feet), significantCloudType: nil)],
+            visibility: Visibility(value: 9, unit: .miles, greaterThanOrEqual: false),
+            weather: [Weather(modifier: .moderate, phenomena: [.showers, .rain])],
+            trends: [],
+            militaryColourCode: .blue,
+            temperature: Temperature(value: 22, unit: .celsius),
+            dewPoint: Temperature(value: 20, unit: .celsius),
+            relativeHumidity: 1,
+            ceilingAndVisibilityOK: false,
+            automaticStation: true,
+            correction: true,
+            noSignificantChangesExpected: true,
+            remarks: "AO2 SLP166 60000 T02170200 10222 20206 53022",
+            metarString: metarString,
+            flightRules: .vfr
+        )
+        
+        XCTAssertEqual(metar, testMETAR)
+    }
+    
     func testLIFRVisibility() {
         XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z FEW010 1/8SM")?.flightRules, .lifr)
         XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z FEW010 1/4SM")?.flightRules, .lifr)
@@ -87,21 +87,21 @@ class METARTests: XCTestCase {
         XCTAssertNil(METAR(rawMETAR: "EGGD 121212Z ///010 10SM")?.flightRules)
     }
     
-     func testWind() {
-     XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 33008G15KT 300V360")?.wind, Wind(direction: 330, speed: Wind.Speed(value: 8, unit: .knots), gustSpeed: Wind.Speed(value: 15, unit: .knots), variation: Wind.Variation(from: 300, to: 360)))
-     }
+    func testWind() {
+        XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 33008G15KT 300V360")?.wind, Wind(direction: 330, speed: Wind.Speed(value: 8, unit: .knots), gustSpeed: Wind.Speed(value: 15, unit: .knots), variation: Wind.Variation(from: 300, to: 360)))
+    }
     
-     func testVisbility() {
-     XCTAssertEqual(METAR(rawMETAR: "EKTE 211720Z AUTO 22011KT 9999NDV NCD 11/10 Q1026=")?.visibility, Visibility(value: 10, unit: .kilometers, greaterThanOrEqual: true))
-     XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 10SM")?.visibility, Visibility(value: 10, unit: .miles, greaterThanOrEqual: false))
-     XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 1 1/8SM")?.visibility, Visibility(value: 1.125, unit: .miles, greaterThanOrEqual: false))
-     XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 9999")?.visibility, Visibility(value: 10, unit: .kilometers, greaterThanOrEqual: true))
-     XCTAssertNil(METAR(rawMETAR: "EGGD 121212Z CAVOK")?.visibility)
-     XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z CAVOK")?.ceilingAndVisibilityOK, true)
-     XCTAssertEqual(METAR(rawMETAR: "EKTE 211720Z AUTO 22011KT 9999NDV NCD 11/10 Q1026=")?.ceilingAndVisibilityOK, false)
-     XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 10SM")?.ceilingAndVisibilityOK, false)
-     XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 9999")?.ceilingAndVisibilityOK, false)
-     }
+    func testVisbility() {
+        XCTAssertEqual(METAR(rawMETAR: "EKTE 211720Z AUTO 22011KT 9999NDV NCD 11/10 Q1026=")?.visibility, Visibility(value: 10, unit: .kilometers, greaterThanOrEqual: true))
+        XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 10SM")?.visibility, Visibility(value: 10, unit: .miles, greaterThanOrEqual: false))
+        XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 1 1/8SM")?.visibility, Visibility(value: 1.125, unit: .miles, greaterThanOrEqual: false))
+        XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 9999")?.visibility, Visibility(value: 10, unit: .kilometers, greaterThanOrEqual: true))
+        XCTAssertNil(METAR(rawMETAR: "EGGD 121212Z CAVOK")?.visibility)
+        XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z CAVOK")?.ceilingAndVisibilityOK, true)
+        XCTAssertEqual(METAR(rawMETAR: "EKTE 211720Z AUTO 22011KT 9999NDV NCD 11/10 Q1026=")?.ceilingAndVisibilityOK, false)
+        XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 10SM")?.ceilingAndVisibilityOK, false)
+        XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z 9999")?.ceilingAndVisibilityOK, false)
+    }
     
     private func date(day: Int, hour: Int, minute: Int) -> Date {
         let calendar = Calendar(identifier: .gregorian)
@@ -116,7 +116,7 @@ class METARTests: XCTestCase {
         components.nanosecond = 0
         return components.date!
     }
-
+    
     static var allTests = [
         ("testDatelessMETAR", testDatelessMETAR),
         ("testSimpleMETAR", testSimpleMETAR),
