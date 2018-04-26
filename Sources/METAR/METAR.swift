@@ -9,26 +9,26 @@ import Foundation
 
 public struct METAR: Codable, Equatable {
     
-    public let identifier: String
-    public let date: Date
-    public let wind: Wind?
-    public let qnh: QNH?
-    public let skyCondition: SkyCondition?
-    public let cloudLayers: [CloudLayer]
-    public let visibility: Visibility?
-    public let weather: [Weather]
-    public let trends: [Forecast]
-    public let militaryColourCode: MilitaryColourCode?
-    public let temperature: Temperature?
-    public let dewPoint: Temperature?
-    public let relativeHumidity: Double?
-    public let ceilingAndVisibilityOK: Bool
-    public let automaticStation: Bool
-    public let correction: Bool
-    public let noSignificantChangesExpected: Bool
-    public let remarks: String?
-    public let metarString: String
-    public let flightRules: NOAAFlightRules?
+    public var identifier: String
+    public var date: Date
+    public var wind: Wind?
+    public var qnh: QNH?
+    public var skyCondition: SkyCondition?
+    public var cloudLayers: [CloudLayer]
+    public var visibility: Visibility?
+    public var weather: [Weather]
+    public var trends: [Forecast]
+    public var militaryColourCode: MilitaryColourCode?
+    public var temperature: Temperature?
+    public var dewPoint: Temperature?
+    public var relativeHumidity: Double?
+    public var ceilingAndVisibilityOK: Bool
+    public var automaticStation: Bool
+    public var correction: Bool
+    public var noSignificantChangesExpected: Bool
+    public var remarks: String?
+    public var metarString: String
+    public var flightRules: NOAAFlightRules?
     
 }
 
@@ -84,7 +84,8 @@ extension METAR {
         guard let loneSlashesRegularExpression = try? NSRegularExpression(pattern: "(^|\\s)(/)+") else { return nil }
         guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z]{4})\\b") else { return nil }
         guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
-        guard let tempoBecomingRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
+        guard let remarksRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
+        guard let tempoBecomingRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(TEMPO|BECMG)(.*)") else { return nil }
         guard let nosigRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)NOSIG\\b") else { return nil }
         guard let militaryColorCodeRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(BLU|WHT|GRN|YLO1|YLO2|AMB|RED)\\b") else { return nil }
         guard let autoRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)AUTO\\b") else { return nil }
@@ -126,7 +127,7 @@ extension METAR {
         // MARK: Date
         
         if let match = metar.matches(for: dateRegularExpression).first, let timeZone = TimeZone(identifier: "UTC"), let dateStringRange = match[0], let dayRange = match[1], let hourRange = match[2], let minuteRange = match[3], let day = Int(String(metar[dayRange])), let hour = Int(String(metar[hourRange])), let minute = Int(String(metar[minuteRange])) {
-            var calendar = Calendar(identifier: Calendar.Identifier.gregorian)
+            var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
             
             var dateComponents = calendar.dateComponents([.year, .month, .day, .timeZone], from: Date())
@@ -155,7 +156,7 @@ extension METAR {
         
         // MARK: Remarks
         
-        if let match = metar.matches(for: tempoBecomingRegularExpression).first, let range = match[0], let remarksRange = match[1] {
+        if let match = metar.matches(for: remarksRegularExpression).first, let range = match[0], let remarksRange = match[1] {
             
             let remarksString = String(metar[remarksRange]).trimmingCharacters(in: .whitespacesAndNewlines)
             
@@ -183,11 +184,13 @@ extension METAR {
             
             forecastString.removeSubrange(forecastString.startIndex..<forecastString.index(forecastString.startIndex, offsetBy: 5))
             
-            forecastString = forecastString.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            forecastString = forecastString.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            guard let forecastMETAR = METAR(metar: forecastString, fullMETAR: false) else {
+            guard var forecastMETAR = METAR(metar: forecastString, fullMETAR: false) else {
                 continue
             }
+            forecastMETAR.identifier = identifier
+            forecastMETAR.date = date
             
             switch metar[forecastRange] {
             case "BECMG":

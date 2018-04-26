@@ -67,6 +67,34 @@ class METARTests: XCTestCase {
         XCTAssertEqual(metar, testMETAR)
     }
     
+    func testTEMPO() {
+        let metarString = "UUDD 261100Z 25007MPS 200V290 9999 BKN026 14/08 Q0997 R88/290095 TEMPO 28012G18MPS 1500 TSRA BKN015CB RMK TEST REMARKS"
+        let metar = METAR(rawMETAR: metarString)
+        let testMETAR = METAR(
+            identifier: "UUDD",
+            date: date(day: 26, hour: 11, minute: 00),
+            wind: Wind(direction: 250, speed: Wind.Speed(value: 7, unit: .metersPerSecond), gustSpeed: nil, variation: Wind.Variation(from: 200, to: 290)),
+            qnh: QNH(value: 997, unit: .hectopascals),
+            skyCondition: nil,
+            cloudLayers: [CloudLayer(coverage: .broken, height: CloudLayer.Height(value: 2600, unit: .feet), significantCloudType: nil)],
+            visibility: Visibility(value: 10, unit: .kilometers, greaterThanOrEqual: true),
+            weather: [],
+            trends: [Forecast(metarRepresentation: METAR(identifier: "UUDD", date: date(day: 26, hour: 11, minute: 00), wind: Wind(direction: 280, speed: Wind.Speed(value: 12, unit: .metersPerSecond), gustSpeed: Wind.Speed(value: 18, unit: .metersPerSecond), variation: nil), qnh: nil, skyCondition: nil, cloudLayers: [CloudLayer(coverage: .broken, height: CloudLayer.Height(value: 1500, unit: .feet), significantCloudType: .cumulonimbus)], visibility: Visibility(value: 1500, unit: .meters, greaterThanOrEqual: false), weather: [Weather(modifier: .moderate, phenomena: [.thunderstorm, .rain])], trends: [], militaryColourCode: nil, temperature: nil, dewPoint: nil, relativeHumidity: nil, ceilingAndVisibilityOK: false, automaticStation: false, correction: false, noSignificantChangesExpected: false, remarks: nil, metarString: "28012G18MPS 1500 TSRA BKN015CB", flightRules: .mvfr), type: .temporaryForecast)],
+            militaryColourCode: nil,
+            temperature: Temperature(value: 14, unit: .celsius),
+            dewPoint: Temperature(value: 8, unit: .celsius),
+            relativeHumidity: 0.67145798064498396,
+            ceilingAndVisibilityOK: false,
+            automaticStation: false,
+            correction: false,
+            noSignificantChangesExpected: false,
+            remarks: "TEST REMARKS",
+            metarString: metarString,
+            flightRules: .mvfr
+        )
+        XCTAssertEqual(metar, testMETAR)
+    }
+    
     func testLIFRVisibility() {
         XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z FEW010 1/8SM")?.flightRules, .lifr)
         XCTAssertEqual(METAR(rawMETAR: "EGGD 121212Z FEW010 1/4SM")?.flightRules, .lifr)
