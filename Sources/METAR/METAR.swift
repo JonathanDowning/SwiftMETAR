@@ -7,6 +7,7 @@
 
 import Foundation
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct METAR: Codable, Equatable {
     
     public var identifier: String
@@ -32,9 +33,10 @@ public struct METAR: Codable, Equatable {
     
 }
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 extension METAR {
     
-    static func noaaFlightRules(ceilingAndVisibilityOK: Bool, cloudLayers: [CloudLayer], visibility: Measurement<UnitLength>?) -> NOAAFlightRules? {
+    private static func noaaFlightRules(ceilingAndVisibilityOK: Bool, cloudLayers: [CloudLayer], visibility: Measurement<UnitLength>?) -> NOAAFlightRules? {
         if ceilingAndVisibilityOK {
             return .vfr
         }
@@ -72,9 +74,10 @@ extension METAR {
     
 }
 
-extension METAR {
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
+public extension METAR {
     
-    public init?(rawMETAR: String) {
+    init?(rawMETAR: String) {
         self.init(metar: rawMETAR, fullMETAR: true)
     }
     
@@ -518,6 +521,7 @@ extension METAR {
     
 }
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct QNH: Equatable, Codable {
     
     enum Unit: String, Codable {
@@ -539,6 +543,7 @@ public struct QNH: Equatable, Codable {
     
 }
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Temperature: Equatable, Codable {
     
     enum Unit: String, Codable {
@@ -557,6 +562,7 @@ public struct Temperature: Equatable, Codable {
     
 }
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Visibility: Equatable, Codable {
     
     public enum Unit: String, Codable {
@@ -582,6 +588,7 @@ public struct Visibility: Equatable, Codable {
     
 }
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Wind: Codable, Equatable {
     
     public struct Speed: Codable, Equatable {
@@ -629,6 +636,7 @@ public enum SkyCondition: String, Codable {
     case skyClear
 }
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct CloudLayer: Equatable, Codable {
     
     public struct Height: Equatable, Codable {
@@ -721,6 +729,7 @@ public enum MilitaryColourCode: String, Codable {
     case red
 }
 
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Forecast: Codable, Equatable {
     
     public enum `Type`: String, Codable {
@@ -739,9 +748,9 @@ public enum NOAAFlightRules: String, Codable {
     case lifr
 }
 
-extension String {
+fileprivate extension String {
     
-    fileprivate func matches(for regularExpression: NSRegularExpression) -> [[Range<String.Index>?]] {
+    func matches(for regularExpression: NSRegularExpression) -> [[Range<String.Index>?]] {
         return regularExpression
             .matches(in: self, range: NSRange(location: 0, length: utf16.count))
             .map { result in (0..<result.numberOfRanges).map { Range(result.range(at: $0), in: self) } }

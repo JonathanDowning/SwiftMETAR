@@ -1,7 +1,8 @@
 import XCTest
 @testable import METAR
 
-class METARTests: XCTestCase {
+@available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
+final class METARTests: XCTestCase {
     
     func testDatelessMETAR() {
         let metarString = "KRDU 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"
