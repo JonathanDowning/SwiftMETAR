@@ -9,7 +9,7 @@ import Foundation
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct METAR: Codable, Equatable {
-    
+
     public var identifier: String
     public var date: Date
     public var wind: Wind?
@@ -30,27 +30,27 @@ public struct METAR: Codable, Equatable {
     public var remarks: String?
     public var metarString: String
     public var flightRules: NOAAFlightRules?
-    
+
 }
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 extension METAR {
-    
+
     private static func noaaFlightRules(ceilingAndVisibilityOK: Bool, cloudLayers: [CloudLayer], visibility: Measurement<UnitLength>?) -> NOAAFlightRules? {
         if ceilingAndVisibilityOK {
             return .vfr
         }
-        
+
         let ceiling = cloudLayers
             .filter { $0.coverage == .overcast || $0.coverage == .skyObscured || $0.coverage == .broken }
             .compactMap { $0.height?.measurement.converted(to: .feet).value }
             .sorted()
             .first ?? .greatestFiniteMagnitude
-        
+
         if ceiling > 3000, let visibilityValue = visibility?.converted(to: .miles).value, visibilityValue > 5 {
             return .vfr
         }
-        
+
         if ceiling < 500 {
             return .lifr
         } else if ceiling < 1000 {
@@ -58,7 +58,7 @@ extension METAR {
         } else if ceiling <= 3000 {
             return .mvfr
         }
-        
+
         if let visibilityValue = visibility?.converted(to: .miles).value {
             if visibilityValue < 1 {
                 return .lifr
@@ -68,22 +68,22 @@ extension METAR {
                 return .mvfr
             }
         }
-        
+
         return nil
     }
-    
+
 }
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public extension METAR {
-    
+
     init?(rawMETAR: String) {
         self.init(metar: rawMETAR, fullMETAR: true)
     }
-    
+
     private init?(metar: String, fullMETAR: Bool = true) {
         var metar = metar
-        
+
         guard let loneSlashesRegularExpression = try? NSRegularExpression(pattern: "(^|\\s)(/)+") else { return nil }
         guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z]{4})\\b") else { return nil }
         guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
@@ -103,21 +103,21 @@ public extension METAR {
         guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:([0-9]+) )?([0-9]+)/([0-9]{1})SM\\b") else { return nil }
         guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
-        
+
         // Lone Slashes Removal
-        
+
         for match in metar.matches(for: loneSlashesRegularExpression).reversed() {
             guard let range = match[0] else {
                 continue
             }
-            
+
             metar.removeSubrange(range)
         }
-        
+
         metarString = metar
-        
+
         // MARK: ICAO
-        
+
         if let match = metar.matches(for: icaoRegularExpression).first, let range = match[0], let identifierRange = match[2], fullMETAR {
             identifier = String(metar[identifierRange])
             metar.removeSubrange(range)
@@ -126,25 +126,25 @@ public extension METAR {
         } else {
             identifier = ""
         }
-        
+
         // MARK: Date
-        
+
         if let match = metar.matches(for: dateRegularExpression).first, let timeZone = TimeZone(identifier: "UTC"), let dateStringRange = match[0], let dayRange = match[1], let hourRange = match[2], let minuteRange = match[3], let day = Int(String(metar[dayRange])), let hour = Int(String(metar[hourRange])), let minute = Int(String(metar[minuteRange])) {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
-            
+
             var dateComponents = calendar.dateComponents([.year, .month, .day, .timeZone], from: Date())
-            
+
             let currentDay = dateComponents.day!
-            
+
             dateComponents.day = day
             dateComponents.hour = hour
             dateComponents.minute = minute
-            
+
             if let day = dateComponents.day, currentDay < day, let month = dateComponents.month {
                 dateComponents.month = month - 1
             }
-            
+
             if let date = calendar.date(from: dateComponents) {
                 self.date = date
                 metar.removeSubrange(dateStringRange)
@@ -156,45 +156,45 @@ public extension METAR {
         } else {
             date = Date()
         }
-        
+
         // MARK: Remarks
-        
+
         if let match = metar.matches(for: remarksRegularExpression).first, let range = match[0], let remarksRange = match[1] {
-            
+
             let remarksString = String(metar[remarksRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-            
+
             if !remarksString.isEmpty {
                 remarks = remarksString
             } else {
                 remarks = nil
             }
-            
+
             metar.removeSubrange(range)
         } else {
             remarks = nil
         }
-        
+
         // MARK: TEMPO BECMG
-        
+
         var forecasts = [Forecast]()
-        
+
         for match in metar.matches(for: tempoBecomingRegularExpression).reversed() {
             guard let range = match[0], let forecastRange = match[1] else {
                 continue
             }
-            
+
             var forecastString = String(metar[range])
-            
+
             forecastString.removeSubrange(forecastString.startIndex..<forecastString.index(forecastString.startIndex, offsetBy: 5))
-            
+
             forecastString = forecastString.trimmingCharacters(in: .whitespacesAndNewlines)
-            
+
             guard var forecastMETAR = METAR(metar: forecastString, fullMETAR: false) else {
                 continue
             }
             forecastMETAR.identifier = identifier
             forecastMETAR.date = date
-            
+
             switch metar[forecastRange] {
             case "BECMG":
                 forecasts.append(Forecast(metarRepresentation: forecastMETAR, type: .becoming))
@@ -203,21 +203,21 @@ public extension METAR {
             default:
                 break
             }
-            
+
             metar.removeSubrange(range)
         }
-        
+
         trends = forecasts
-        
+
         if let match = metar.matches(for: nosigRegularExpression).first, let range = match[0] {
             noSignificantChangesExpected = true
             metar.removeSubrange(range)
         } else {
             noSignificantChangesExpected = false
         }
-        
+
         // MARK: Military Colour Code
-        
+
         if let match = metar.matches(for: militaryColorCodeRegularExpression).first, let range = match[0], let colourRange = match[1] {
             switch String(metar[colourRange]) {
             case "BLU":
@@ -241,31 +241,31 @@ public extension METAR {
         } else {
             militaryColourCode = nil
         }
-        
+
         // MARK: AUTO
-        
+
         if let match = metar.matches(for: autoRegularExpression).first, let range = match[0] {
             automaticStation = true
             metar.removeSubrange(range)
         } else {
             automaticStation = false
         }
-        
+
         // MARK: COR
-        
+
         if let match = metar.matches(for: correctionRegularExpression).first, let range = match[0] {
             correction = true
             metar.removeSubrange(range)
         } else {
             correction = false
         }
-        
+
         // MARK: Wind
-        
+
         if let match = metar.matches(for: windRegularExpression).first, let range = match[0], let directionRange = match[1], let conversionRange = match[4], let speedRange = match[2], let speed = Double(String(metar[speedRange])) {
-            
+
             let speedUnit: Wind.Speed.Unit
-            
+
             switch metar[conversionRange] {
             case "MPS":
                 speedUnit = .metersPerSecond
@@ -274,35 +274,35 @@ public extension METAR {
             default:
                 speedUnit = .knots
             }
-            
+
             let directionString = String(metar[directionRange])
-            
+
             let gustSpeed: Wind.Speed?
             if let gustRange = match[3], let gust = Double(String(metar[gustRange])) {
                 gustSpeed = Wind.Speed(value: gust, unit: speedUnit)
             } else {
                 gustSpeed = nil
             }
-            
+
             let variation: Wind.Variation?
-            
+
             if let variationMinRange = match[5], let variationMaxRange = match[6], let min = Double(String(metar[variationMinRange])), let max = Double(String(metar[variationMaxRange])) {
                 variation = Wind.Variation(from: min, to: max)
             } else {
                 variation = nil
             }
-            
+
             wind = Wind(direction: Double(directionString), speed: Wind.Speed(value: speed, unit: speedUnit), gustSpeed: gustSpeed, variation: variation)
-            
+
             metar.removeSubrange(range)
         } else {
             wind = nil
         }
-        
+
         // MARK: Clouds
-        
+
         if let match = metar.matches(for: cloudsRegularExpression).first, let range = match[0], let cloudStringRange = match[1] {
-            
+
             switch metar[cloudStringRange] {
             case "SKC":
                 skyCondition = .skyClear
@@ -315,40 +315,40 @@ public extension METAR {
             default:
                 skyCondition = nil
             }
-            
+
             cloudLayers = []
-            
+
             metar.removeSubrange(range)
         } else {
             let cloudLayerMatches = metar.matches(for: cloudLayerRegularExpression)
-            
+
             skyCondition = nil
-            
+
             cloudLayers = cloudLayerMatches.compactMap { match in
-                
+
                 guard let typeRange = match[1] else {
                     return nil
                 }
-                
+
                 let type = (metar[typeRange])
-                
+
                 let significantCloudTypeString: String?
                 if let significantCloudRange = match[3] {
                     significantCloudTypeString = String(metar[significantCloudRange])
                 } else {
                     significantCloudTypeString = nil
                 }
-                
+
                 let cloudHeight: Double?
-                
+
                 if let heightRange = match[2], let height = Double(String(metar[heightRange])) {
                     cloudHeight = height * 100
                 } else {
                     cloudHeight = nil
                 }
-                
+
                 let coverage: CloudLayer.Coverage
-                
+
                 switch type {
                 case "FEW":
                     coverage = .few
@@ -363,9 +363,9 @@ public extension METAR {
                 default:
                     coverage = .notReported
                 }
-                
+
                 let significantCloud: CloudLayer.SignificantCloudType?
-                
+
                 switch significantCloudTypeString {
                 case "CB"?:
                     significantCloud = .cumulonimbus
@@ -374,30 +374,30 @@ public extension METAR {
                 default:
                     significantCloud = nil
                 }
-                
+
                 return CloudLayer(coverage: coverage, height: cloudHeight.map { CloudLayer.Height(value: $0, unit: .feet) }, significantCloudType: significantCloud)
             }
-            
+
             for match in cloudLayerMatches.reversed() {
                 if let range = match[0] {
                     metar.removeSubrange(range)
                 }
             }
         }
-        
+
         // MARK: Temperatures
-        
+
         if let match = metar.matches(for: temperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], let rawTemperature = Double(String(metar[temperatureRange])), let dewPointRange = match[4], let rawDewPoint = Double(String(metar[dewPointRange])) {
-            
+
             let temperatureIsNegative = match[1] != nil
             let temperature = rawTemperature * (temperatureIsNegative ? -1 : 1)
-            
+
             let dewPointIsNegative = match[3] != nil
             let dewPoint = rawDewPoint * (dewPointIsNegative ? -1 : 1)
-            
+
             self.temperature = Temperature(value: temperature, unit: .celsius)
             self.dewPoint = Temperature(value: dewPoint, unit: .celsius)
-            
+
             metar.removeSubrange(range)
         } else if let match = metar.matches(for: malformedTemperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], var temperature = Double(String(metar[temperatureRange])) {
             let temperatureIsNegative = match[1] != nil
@@ -409,15 +409,15 @@ public extension METAR {
             self.temperature = nil
             self.dewPoint = nil
         }
-        
+
         // MARK: Visibility
-        
+
         let visibility: Visibility?
-        
+
         if let match = metar.matches(for: visibilityRegularExpression).first, let range = match[0], let visibilityRange = match[1] {
-            
+
             let visibilityString = String(metar[visibilityRange])
-            
+
             if visibilityString == "CAVOK" {
                 visibility = nil
                 ceilingAndVisibilityOK = true
@@ -431,42 +431,42 @@ public extension METAR {
                 visibility = nil
                 ceilingAndVisibilityOK = false
             }
-            
+
             metar.removeSubrange(range)
         } else if let match = metar.matches(for: metricVisibilityRegularExpression).first, let range = match[0], let visibilityRange = match[1], let distance = Double(String(metar[visibilityRange])) {
             visibility = Visibility(value: distance, unit: .miles, greaterThanOrEqual: false)
             ceilingAndVisibilityOK = false
             metar.removeSubrange(range)
         } else if let match = metar.matches(for: metricFractionVisibilityRegularExpression).first, let range = match[0], let numeratorRange = match[2], let denominatorRange = match[3], let numerator = Double(String(metar[numeratorRange])), let denominator = Double(String(metar[denominatorRange])), denominator > 0 {
-            
+
             let wholeNumber = match[1].flatMap { Double(String(metar[$0])) } ?? 0
-            
+
             visibility = Visibility(value: numerator / denominator + wholeNumber, unit: .miles, greaterThanOrEqual: false)
-            
+
             ceilingAndVisibilityOK = false
-            
+
             metar.removeSubrange(range)
         } else {
             ceilingAndVisibilityOK = false
-            
+
             visibility = nil
         }
-        
+
         self.visibility = visibility
-        
+
         // MARK: Weather
-        
+
         var weather = [Weather]()
-        
+
         for match in metar.matches(for: weatherRegularExpression).reversed() {
             let modifier: Weather.Modifier
-            
+
             if let modifierRange = match[1], let modifierCode = Weather.Modifier(rawValue: String(metar[modifierRange])) {
                 modifier = modifierCode
             } else {
                 modifier = .moderate
             }
-            
+
             let weatherStrings: [String] = match.suffix(from: 2).compactMap {
                 if let weatherStringRange = $0 {
                     return String(metar[weatherStringRange])
@@ -474,29 +474,29 @@ public extension METAR {
                     return nil
                 }
             }
-            
+
             let parseWeatherStrings = { (strings: [String]) -> [Weather.Phenomena]? in
                 let phenomena = strings.compactMap { Weather.Phenomena(rawValue: $0) }
-                
+
                 if phenomena.count != strings.count {
                     return nil
                 }
-                
+
                 return phenomena
             }
-            
+
             if let phenomena = parseWeatherStrings(weatherStrings), let range = match[0] {
                 weather.append(Weather(modifier: modifier, phenomena: phenomena))
                 metar.removeSubrange(range)
             }
         }
-        
+
         self.weather = weather.reversed()
-        
+
         // MARK: Pressure
-        
+
         if let match = metar.matches(for: pressureRegularExpression).first, let range = match[0] {
-            
+
             if let qnhRange = match[1], let qnh = Double(String(metar[qnhRange])) {
                 self.qnh = QNH(value: qnh, unit: .hectopascals)
                 metar.removeSubrange(range)
@@ -509,29 +509,29 @@ public extension METAR {
         } else {
             qnh = nil
         }
-        
+
         if let temperature = temperature?.measurement.converted(to: .celsius).value, let dewPoint = dewPoint?.measurement.converted(to: .celsius).value {
             relativeHumidity = exp((17.625 * dewPoint) / (243.04 + dewPoint)) / exp((17.625 * temperature) / (243.04 + temperature))
         } else {
             relativeHumidity = nil
         }
-        
+
         self.flightRules = METAR.noaaFlightRules(ceilingAndVisibilityOK: self.ceilingAndVisibilityOK, cloudLayers: self.cloudLayers, visibility: self.visibility?.measurement)
     }
-    
+
 }
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct QNH: Equatable, Codable {
-    
+
     enum Unit: String, Codable {
         case hectopascals
         case inchesOfMercury
     }
-    
+
     let value: Double
     let unit: Unit
-    
+
     public var measurement: Measurement<UnitPressure> {
         switch unit {
         case .hectopascals:
@@ -540,41 +540,41 @@ public struct QNH: Equatable, Codable {
             return Measurement(value: value, unit: .inchesOfMercury)
         }
     }
-    
+
 }
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Temperature: Equatable, Codable {
-    
+
     enum Unit: String, Codable {
         case celsius
     }
-    
+
     let value: Double
     let unit: Unit
-    
+
     public var measurement: Measurement<UnitTemperature> {
         switch unit {
         case .celsius:
             return Measurement(value: value, unit: .celsius)
         }
     }
-    
+
 }
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Visibility: Equatable, Codable {
-    
+
     public enum Unit: String, Codable {
         case kilometers
         case meters
         case miles
     }
-    
+
     public let value: Double
     public let unit: Unit
     public let greaterThanOrEqual: Bool
-    
+
     public var measurement: Measurement<UnitLength> {
         switch unit {
         case .kilometers:
@@ -585,23 +585,23 @@ public struct Visibility: Equatable, Codable {
             return Measurement(value: value, unit: .miles)
         }
     }
-    
+
 }
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Wind: Codable, Equatable {
-    
+
     public struct Speed: Codable, Equatable {
-        
+
         public enum Unit: String, Codable {
             case knots
             case metersPerSecond
             case kilometersPerHour
         }
-        
+
         public let value: Double
         public let unit: Unit
-        
+
         public var measurement: Measurement<UnitSpeed> {
             switch unit {
             case .knots:
@@ -612,21 +612,21 @@ public struct Wind: Codable, Equatable {
                 return Measurement(value: value, unit: .kilometersPerHour)
             }
         }
-        
+
     }
-    
+
     public typealias Degrees = Double
-    
+
     public let direction: Degrees?
     public let speed: Speed
     public let gustSpeed: Speed?
     public let variation: Variation?
-    
+
     public struct Variation: Equatable, Codable {
         public let from: Degrees
         public let to: Degrees
     }
-    
+
 }
 
 public enum SkyCondition: String, Codable {
@@ -638,44 +638,44 @@ public enum SkyCondition: String, Codable {
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct CloudLayer: Equatable, Codable {
-    
+
     public struct Height: Equatable, Codable {
-        
+
         enum Unit: String, Codable {
             case feet
         }
-        
+
         let value: Double
         let unit: Unit
-        
+
         public var measurement: Measurement<UnitLength> {
             switch unit {
             case .feet:
                 return Measurement(value: value, unit: .feet)
             }
         }
-        
+
     }
-    
+
     public let coverage: Coverage
     public let height: Height?
     public let significantCloudType: SignificantCloudType?
-    
+
     public enum Coverage: String, Codable {
         case few, scattered, broken, overcast, skyObscured, notReported
     }
-    
+
     public enum SignificantCloudType: String, Codable {
         case cumulonimbus, toweringCumulus
     }
-    
+
 }
 
 public struct Weather: Equatable, Codable {
-    
+
     public let modifier: Modifier
     public let phenomena: [Phenomena]
-    
+
     public enum Modifier: String, Codable {
         case light = "-"
         case moderate
@@ -683,7 +683,7 @@ public struct Weather: Equatable, Codable {
         case inTheVicinity = "VC"
         case recent = "RE"
     }
-    
+
     public enum Phenomena: String, Codable {
         case shallow = "MI"
         case partial = "PR"
@@ -716,7 +716,7 @@ public struct Weather: Equatable, Codable {
         case funnelCloud = "FC"
         case wellDevelopedDustWhirls = "PO"
     }
-    
+
 }
 
 public enum MilitaryColourCode: String, Codable {
@@ -731,14 +731,14 @@ public enum MilitaryColourCode: String, Codable {
 
 @available(iOS 10.0, macOS 10.12, tvOS 10.0, watchOS 3.0, *)
 public struct Forecast: Codable, Equatable {
-    
+
     public enum `Type`: String, Codable {
         case becoming = "BECMG", temporaryForecast = "TEMPO"
     }
-    
+
     public let metarRepresentation: METAR
     public let type: Type
-    
+
 }
 
 public enum NOAAFlightRules: String, Codable {
@@ -749,11 +749,11 @@ public enum NOAAFlightRules: String, Codable {
 }
 
 fileprivate extension String {
-    
+
     func matches(for regularExpression: NSRegularExpression) -> [[Range<String.Index>?]] {
         return regularExpression
             .matches(in: self, range: NSRange(location: 0, length: utf16.count))
             .map { result in (0..<result.numberOfRanges).map { Range(result.range(at: $0), in: self) } }
     }
-    
+
 }
