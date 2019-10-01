@@ -8,6 +8,6 @@ It goes without saying that there are probably bugs, I think it's fair to say th
 
 As for API stability, I may add, change, or remove fields in the future, but I'll observe the semantic versioning system to ensure minimum disruption to anyone who wants to use this.
 
-At any rate, if you use Swift Package Manager or Cocoapods to use this code, perhaps you should consider pinning the precise version to avoid upsets.
+At any rate, if you use Swift Package Manager to use this code, perhaps you should consider pinning the precise version to avoid upsets.
 
 Thank you.
