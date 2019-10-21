@@ -1,24 +1,15 @@
-name: Test
+name: Swift
 
-on:
-   push:
-     branches:
-       - master
-     tags:
-       - '*'
-   pull_request:
-     branches:
-       - master
+on: [push]
 
 jobs:
-  test:
-    name: Test
-    strategy:
-      matrix:
-        platform: [macos-latest]
-    runs-on: ${{ matrix.platform }}
+  build:
+
+    runs-on: macOS-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-      - name: Run Tests
-        run: swift test
+    - uses: actions/checkout@v1
+    - name: Build
+      run: swift build -v
+    - name: Run tests
+      run: swift test -v
