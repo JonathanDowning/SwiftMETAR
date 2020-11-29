@@ -14,21 +14,34 @@ public struct METAR: Codable, Equatable {
     public var wind: Wind?
     public var qnh: QNH?
     public var skyCondition: SkyCondition?
-    public var cloudLayers: [CloudLayer]
+    public var cloudLayers: [CloudLayer] = []
     public var visibility: Visibility?
-    public var weather: [Weather]
-    public var trends: [Forecast]
+    public var weather: [Weather] = []
+    public var trends: [Forecast] = []
     public var militaryColourCode: MilitaryColourCode?
     public var temperature: Temperature?
     public var dewPoint: Temperature?
-    public var relativeHumidity: Double?
-    public var ceilingAndVisibilityOK: Bool
-    public var automaticStation: Bool
-    public var correction: Bool
-    public var noSignificantChangesExpected: Bool
+    public var ceilingAndVisibilityOK = false
+    public var automaticStation = false
+    public var correction = false
+    public var noSignificantChangesExpected = false
     public var remarks: String?
     public var metarString: String
     public var flightRules: NOAAFlightRules?
+
+}
+
+extension METAR {
+
+    public var relativeHumidity: Double? {
+        guard
+            let temperature = temperature?.measurement.converted(to: .celsius).value,
+            let dewPoint = dewPoint?.measurement.converted(to: .celsius).value
+        else {
+            return nil
+        }
+        return exp((17.625 * dewPoint) / (243.04 + dewPoint)) / exp((17.625 * temperature) / (243.04 + temperature))
+    }
 
 }
 
@@ -40,11 +53,21 @@ extension METAR {
             return .vfr
         }
 
-        let ceiling = cloudLayers
-            .filter { $0.coverage == .overcast || $0.coverage == .skyObscured || $0.coverage == .broken }
-            .compactMap { $0.height?.measurement.converted(to: .feet).value }
-            .sorted()
-            .first ?? .greatestFiniteMagnitude
+        var ceiling = Double.greatestFiniteMagnitude
+        for layer in cloudLayers {
+            if layer.coverage == .notReported, let height = layer.height?.measurement.converted(to: .feet).value, height <= 3000 {
+                return nil
+            }
+            guard layer.coverage == .overcast || layer.coverage == .skyObscured || layer.coverage == .broken else {
+                continue
+            }
+            guard let height = layer.height?.measurement.converted(to: .feet).value else {
+                return nil
+            }
+            if ceiling > height {
+                ceiling = height
+            }
+        }
 
         if ceiling > 3000, let visibilityValue = visibility?.converted(to: .miles).value, visibilityValue > 5 {
             return .vfr
@@ -83,7 +106,7 @@ public extension METAR {
     private init?(metar: String, fullMETAR: Bool = true) {
         var metar = metar
 
-        guard let loneSlashesRegularExpression = try? NSRegularExpression(pattern: "(^|\\s)(/)+") else { return nil }
+        guard let loneSlashesRegularExpression = try? NSRegularExpression(pattern: "^(/)+") else { return nil }
         guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z]{4})\\b") else { return nil }
         guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
         guard let remarksRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
@@ -509,12 +532,6 @@ public extension METAR {
             qnh = nil
         }
 
-        if let temperature = temperature?.measurement.converted(to: .celsius).value, let dewPoint = dewPoint?.measurement.converted(to: .celsius).value {
-            relativeHumidity = exp((17.625 * dewPoint) / (243.04 + dewPoint)) / exp((17.625 * temperature) / (243.04 + temperature))
-        } else {
-            relativeHumidity = nil
-        }
-
         self.flightRules = METAR.noaaFlightRules(ceilingAndVisibilityOK: self.ceilingAndVisibilityOK, cloudLayers: self.cloudLayers, visibility: self.visibility?.measurement)
     }
 
@@ -570,9 +587,9 @@ public struct Visibility: Equatable, Codable {
         case miles
     }
 
-    public let value: Double
-    public let unit: Unit
-    public let greaterThanOrEqual: Bool
+    public var value: Double
+    public var unit: Unit
+    public var greaterThanOrEqual = false
 
     public var measurement: Measurement<UnitLength> {
         switch unit {
@@ -598,8 +615,8 @@ public struct Wind: Codable, Equatable {
             case kilometersPerHour
         }
 
-        public let value: Double
-        public let unit: Unit
+        public var value: Double
+        public var unit: Unit
 
         public var measurement: Measurement<UnitSpeed> {
             switch unit {
@@ -616,14 +633,14 @@ public struct Wind: Codable, Equatable {
 
     public typealias Degrees = Double
 
-    public let direction: Degrees?
-    public let speed: Speed
-    public let gustSpeed: Speed?
-    public let variation: Variation?
+    public var direction: Degrees?
+    public var speed: Speed
+    public var gustSpeed: Speed?
+    public var variation: Variation?
 
     public struct Variation: Equatable, Codable {
-        public let from: Degrees
-        public let to: Degrees
+        public var from: Degrees
+        public var to: Degrees
     }
 
 }
@@ -644,8 +661,8 @@ public struct CloudLayer: Equatable, Codable {
             case feet
         }
 
-        let value: Double
-        let unit: Unit
+        var value: Double
+        var unit: Unit
 
         public var measurement: Measurement<UnitLength> {
             switch unit {
@@ -656,9 +673,9 @@ public struct CloudLayer: Equatable, Codable {
 
     }
 
-    public let coverage: Coverage
-    public let height: Height?
-    public let significantCloudType: SignificantCloudType?
+    public var coverage: Coverage
+    public var height: Height?
+    public var significantCloudType: SignificantCloudType?
 
     public enum Coverage: String, Codable {
         case few, scattered, broken, overcast, skyObscured, notReported
@@ -672,8 +689,8 @@ public struct CloudLayer: Equatable, Codable {
 
 public struct Weather: Equatable, Codable {
 
-    public let modifier: Modifier
-    public let phenomena: [Phenomena]
+    public var modifier: Modifier
+    public var phenomena: [Phenomena] = []
 
     public enum Modifier: String, Codable {
         case light = "-"
@@ -735,8 +752,8 @@ public struct Forecast: Codable, Equatable {
         case becoming = "BECMG", temporaryForecast = "TEMPO"
     }
 
-    public let metarRepresentation: METAR
-    public let type: Type
+    public var metarRepresentation: METAR
+    public var type: Type
 
 }
 
