@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct METAR: Codable, Equatable {
+public struct METAR: Equatable {
 
     public var identifier: String
     public var date: Date
@@ -415,14 +415,14 @@ public extension METAR {
             let dewPointIsNegative = match[3] != nil
             let dewPoint = rawDewPoint * (dewPointIsNegative ? -1 : 1)
 
-            self.temperature = Temperature(value: temperature, unit: .celsius)
-            self.dewPoint = Temperature(value: dewPoint, unit: .celsius)
+            self.temperature = Temperature(value: temperature)
+            self.dewPoint = Temperature(value: dewPoint)
 
             metar.removeSubrange(range)
         } else if let match = metar.matches(for: malformedTemperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], var temperature = Double(String(metar[temperatureRange])) {
             let temperatureIsNegative = match[1] != nil
             temperature *= (temperatureIsNegative ? -1 : 1)
-            self.temperature = Temperature(value: temperature, unit: .celsius)
+            self.temperature = Temperature(value: temperature)
             self.dewPoint = nil
             metar.removeSubrange(range)
         } else {
@@ -480,10 +480,16 @@ public extension METAR {
 
         for match in metar.matches(for: weatherRegularExpression).reversed() {
             let modifier: Weather.Modifier
-
-            if let modifierRange = match[1], let modifierCode = Weather.Modifier(rawValue: String(metar[modifierRange])) {
-                modifier = modifierCode
-            } else {
+            switch match[1].map({ String(metar[$0]) }) {
+            case "+":
+                modifier = .heavy
+            case "-":
+                modifier = .light
+            case "RE":
+                modifier = .recent
+            case "VC":
+                modifier = .inTheVicinity
+            default:
                 modifier = .moderate
             }
 
@@ -535,9 +541,9 @@ public extension METAR {
 
 }
 
-public struct QNH: Equatable, Codable {
+public struct QNH: Equatable {
 
-    enum Unit: String, Codable {
+    enum Unit {
         case hectopascals
         case inchesOfMercury
     }
@@ -556,27 +562,19 @@ public struct QNH: Equatable, Codable {
 
 }
 
-public struct Temperature: Equatable, Codable {
-
-    enum Unit: String, Codable {
-        case celsius
-    }
+public struct Temperature: Equatable {
 
     let value: Double
-    let unit: Unit
 
     public var measurement: Measurement<UnitTemperature> {
-        switch unit {
-        case .celsius:
-            return Measurement(value: value, unit: .celsius)
-        }
+        Measurement(value: value, unit: .celsius)
     }
 
 }
 
-public struct Visibility: Equatable, Codable {
+public struct Visibility: Equatable {
 
-    public enum Unit: String, Codable {
+    public enum Unit {
         case kilometers
         case meters
         case miles
@@ -599,11 +597,11 @@ public struct Visibility: Equatable, Codable {
 
 }
 
-public struct Wind: Codable, Equatable {
+public struct Wind: Equatable {
 
-    public struct Speed: Codable, Equatable {
+    public struct Speed: Equatable {
 
-        public enum Unit: String, Codable {
+        public enum Unit {
             case knots
             case metersPerSecond
             case kilometersPerHour
@@ -632,25 +630,25 @@ public struct Wind: Codable, Equatable {
     public var gustSpeed: Speed?
     public var variation: Variation?
 
-    public struct Variation: Equatable, Codable {
+    public struct Variation: Equatable {
         public var from: Degrees
         public var to: Degrees
     }
 
 }
 
-public enum SkyCondition: String, Codable {
+public enum SkyCondition {
     case clear
     case noCloudDetected
     case noSignificantCloud
     case skyClear
 }
 
-public struct CloudLayer: Equatable, Codable {
+public struct CloudLayer: Equatable {
 
-    public struct Height: Equatable, Codable {
+    public struct Height: Equatable {
 
-        enum Unit: String, Codable {
+        enum Unit {
             case feet
         }
 
@@ -670,30 +668,30 @@ public struct CloudLayer: Equatable, Codable {
     public var height: Height?
     public var significantCloudType: SignificantCloudType?
 
-    public enum Coverage: String, Codable {
+    public enum Coverage {
         case few, scattered, broken, overcast, skyObscured, notReported
     }
 
-    public enum SignificantCloudType: String, Codable {
+    public enum SignificantCloudType {
         case cumulonimbus, toweringCumulus
     }
 
 }
 
-public struct Weather: Equatable, Codable {
+public struct Weather: Equatable {
 
     public var modifier: Modifier
     public var phenomena: [Phenomena] = []
 
-    public enum Modifier: String, Codable {
-        case light = "-"
+    public enum Modifier {
+        case light
         case moderate
-        case heavy = "+"
-        case inTheVicinity = "VC"
-        case recent = "RE"
+        case heavy
+        case inTheVicinity
+        case recent
     }
 
-    public enum Phenomena: String, Codable {
+    public enum Phenomena: String {
         case shallow = "MI"
         case partial = "PR"
         case patches = "BC"
@@ -728,7 +726,7 @@ public struct Weather: Equatable, Codable {
 
 }
 
-public enum MilitaryColourCode: String, Codable {
+public enum MilitaryColourCode {
     case blue
     case white
     case green
@@ -738,10 +736,10 @@ public enum MilitaryColourCode: String, Codable {
     case red
 }
 
-public struct Forecast: Codable, Equatable {
+public struct Forecast: Equatable {
 
-    public enum `Type`: String, Codable {
-        case becoming = "BECMG", temporaryForecast = "TEMPO"
+    public enum `Type` {
+        case becoming, temporaryForecast
     }
 
     public var metarRepresentation: METAR
@@ -749,7 +747,7 @@ public struct Forecast: Codable, Equatable {
 
 }
 
-public enum NOAAFlightRules: String, Codable {
+public enum NOAAFlightRules: String {
     case vfr
     case mvfr
     case ifr
