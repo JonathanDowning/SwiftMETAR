@@ -640,16 +640,16 @@ public struct Visibility: Equatable {
 
 }
 
-public struct RunwayVisualRange: Codable, Equatable {
+public struct RunwayVisualRange: Equatable {
 
-    public enum Visibility: Codable, Equatable {
+    public enum Visibility: Equatable {
         case lessThan(Measurement<UnitLength>)
         case equal(Measurement<UnitLength>)
         case greaterThan(Measurement<UnitLength>)
         case variable(Measurement<UnitLength>, Measurement<UnitLength>)
     }
 
-    public enum Trend: String, Codable {
+    public enum Trend {
         case increasing, decreasing, notChanging
     }
 
