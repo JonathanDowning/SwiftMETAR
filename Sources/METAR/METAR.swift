@@ -16,6 +16,7 @@ public struct METAR: Codable, Equatable {
     public var skyCondition: SkyCondition?
     public var cloudLayers: [CloudLayer] = []
     public var visibility: Visibility?
+    public var runwayVisualRanges: [RunwayVisualRange] = []
     public var weather: [Weather] = []
     public var trends: [Forecast] = []
     public var militaryColourCode: MilitaryColourCode?
@@ -123,6 +124,7 @@ public extension METAR {
         guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:([0-9]+) )?([0-9]+)/([0-9]{1})SM\\b") else { return nil }
         guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
+        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)R([0-9]{2}[L|C|R]?)\\/(?:(?:([P|M]?)([0-9]{4}))|(?:([0-9]{4})V([0-9]{4})))(FT)?(U|D|N)?\\b") else { return nil }
 
         // Lone Slashes Removal
 
@@ -227,7 +229,7 @@ public extension METAR {
             metar.removeSubrange(range)
         }
 
-        trends = forecasts
+        trends = forecasts.reversed()
 
         if let match = metar.matches(for: nosigRegularExpression).first, let range = match[0] {
             noSignificantChangesExpected = true
@@ -235,6 +237,47 @@ public extension METAR {
         } else {
             noSignificantChangesExpected = false
         }
+
+        // MARK: Runway Visual Range
+
+        var rvrs = [RunwayVisualRange]()
+        for match in metar.matches(for: rvrRegularExpression).reversed() {
+            guard let range = match[0], let runwayRange = match[1] else {
+                continue
+            }
+
+            let unit: UnitLength = match[6].map { metar[$0] } == "FT" ? .feet : .meters
+
+            let visibility: RunwayVisualRange.Visibility
+            if let lower = match[4].flatMap({ Double(String(metar[$0])) }), let upper = match[5].flatMap({ Double(String(metar[$0])) }) {
+                visibility = .variable(.init(value: min(lower, upper), unit: unit), .init(value: max(lower, upper), unit: unit))
+            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "M" {
+                visibility = .lessThan(.init(value: value, unit: unit))
+            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "P" {
+                visibility = .greaterThan(.init(value: value, unit: unit))
+            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }) {
+                visibility = .equal(.init(value: value, unit: unit))
+            } else {
+                continue
+            }
+
+            let trend: RunwayVisualRange.Trend?
+            switch match[7].map({ metar[$0] }) {
+            case "U":
+                trend = .increasing
+            case "D":
+                trend = .decreasing
+            case "N":
+                trend = .notChanging
+            default:
+                trend = nil
+            }
+
+            rvrs.append(.init(runway: String(metar[runwayRange]), visibility: visibility, trend: trend))
+
+            metar.removeSubrange(range)
+        }
+        self.runwayVisualRanges = rvrs.reversed()
 
         // MARK: Military Colour Code
 
@@ -599,6 +642,25 @@ public struct Visibility: Equatable, Codable {
 
 }
 
+public struct RunwayVisualRange: Codable, Equatable {
+
+    public enum Visibility: Codable, Equatable {
+        case lessThan(Measurement<UnitLength>)
+        case equal(Measurement<UnitLength>)
+        case greaterThan(Measurement<UnitLength>)
+        case variable(Measurement<UnitLength>, Measurement<UnitLength>)
+    }
+
+    public enum Trend: String, Codable {
+        case increasing, decreasing, notChanging
+    }
+
+    public var runway: String
+    public var visibility: Visibility
+    public var trend: Trend?
+
+}
+
 public struct Wind: Codable, Equatable {
 
     public struct Speed: Codable, Equatable {
@@ -682,7 +744,7 @@ public struct CloudLayer: Equatable, Codable {
 
 public struct Weather: Equatable, Codable {
 
-    public var modifier: Modifier
+    public var modifier: Modifier = .moderate
     public var phenomena: [Phenomena] = []
 
     public enum Modifier: String, Codable {
