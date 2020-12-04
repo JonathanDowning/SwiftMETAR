@@ -124,7 +124,7 @@ public extension METAR {
         guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:([0-9]+) )?([0-9]+)/([0-9]{1})SM\\b") else { return nil }
         guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
-        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)R([0-9]{2}[L|C|R]?)\\/(?:(?:([P|M]?)([0-9]{4}))|(?:([0-9]{4})V([0-9]{4})))(FT)?(U|D|N)?\\b") else { return nil }
+        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(U|D|N)?\\b") else { return nil }
 
         // Lone Slashes Removal
 
@@ -242,29 +242,37 @@ public extension METAR {
 
         var rvrs = [RunwayVisualRange]()
         for match in metar.matches(for: rvrRegularExpression).reversed() {
-            guard let range = match[0], let runwayRange = match[1] else {
+            guard let range = match[0], let runwayRange = match[1], let visibilityValue = match[3].flatMap({ Double(String(metar[$0])) }) else {
                 continue
             }
 
             let unit: UnitLength = match[6].map { metar[$0] } == "FT" ? .feet : .meters
 
-            let visibility: RunwayVisualRange.Visibility
-            let variableVisibility: RunwayVisualRange.Visibility?
-            if let lower = match[4].flatMap({ Double(String(metar[$0])) }), let upper = match[5].flatMap({ Double(String(metar[$0])) }) {
-                visibility = .init(measurement: .init(value: min(lower, upper), unit: unit))
-                variableVisibility = .init(measurement: .init(value: max(lower, upper), unit: unit))
-            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "M" {
-                visibility = .init(modifier: .lessThan, measurement: .init(value: value, unit: unit))
-                variableVisibility = nil
-            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "P" {
-                visibility = .init(modifier: .greaterThan, measurement: .init(value: value, unit: unit))
-                variableVisibility = nil
-            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }) {
-                visibility = .init(measurement: .init(value: value, unit: unit))
-                variableVisibility = nil
-            } else {
-                continue
+            let visbilityModifier: RunwayVisualRange.Visibility.Modifier
+            switch match[2].map({ metar[$0] }) {
+            case "M":
+                visbilityModifier = .lessThan
+            case "P":
+                visbilityModifier = .greaterThan
+            default:
+                visbilityModifier = .equalTo
             }
+
+            let visibility = RunwayVisualRange.Visibility(modifier: visbilityModifier, measurement: .init(value: visibilityValue, unit: unit))
+
+            let variableVisibility: RunwayVisualRange.Visibility? = match[5].flatMap({ Double(String(metar[$0])) }).map { value in
+                let variableVisibilityModifier: RunwayVisualRange.Visibility.Modifier
+                switch match[4].map({ metar[$0] }) {
+                case "M":
+                    variableVisibilityModifier = .lessThan
+                case "P":
+                    variableVisibilityModifier = .greaterThan
+                default:
+                    variableVisibilityModifier = .equalTo
+                }
+                return .init(modifier: variableVisibilityModifier, measurement: .init(value: value, unit: unit))
+            }
+
 
             let trend: RunwayVisualRange.Trend?
             switch match[7].map({ metar[$0] }) {
