@@ -653,25 +653,61 @@ public struct Visibility: Equatable {
 
 }
 
-public struct RunwayVisualRange: Equatable {
+public struct RunwayVisualRange: Equatable, CustomStringConvertible {
 
-    public struct Visibility: Equatable {
+    public struct Visibility: Equatable, CustomStringConvertible {
+
         public enum Modifier {
             case lessThan, equalTo, greaterThan
         }
 
         public var modifier: Modifier = .equalTo
         public var measurement: Measurement<UnitLength>
+
+        public var description: String {
+            switch modifier {
+            case .lessThan:
+                return "<\(measurement)"
+            case .equalTo:
+                return "\(measurement)"
+            case .greaterThan:
+                return ">\(measurement)"
+            }
+        }
     }
 
-    public enum Trend {
-        case increasing, decreasing, notChanging
+    public enum Trend: CustomStringConvertible {
+        case decreasing
+        case notChanging
+        case increasing
+
+        public var description: String {
+            switch self {
+            case .decreasing:
+                return "Decreasing"
+            case .notChanging:
+                return "Not Changing"
+            case .increasing:
+                return "Increasing"
+            }
+        }
     }
 
     public var runway: String
     public var visibility: Visibility
     public var variableVisibility: Visibility?
     public var trend: Trend?
+
+    public var description: String {
+        var description = "Runway \(runway): \(visibility)"
+        if let variableVisibility = variableVisibility {
+            description += " – \(variableVisibility)"
+        }
+        if let trend = trend {
+            description += " \(trend)"
+        }
+        return description
+    }
 
 }
 
