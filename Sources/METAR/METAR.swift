@@ -592,12 +592,6 @@ public extension METAR {
             qnh = nil
         }
 
-        metar = metar.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if !metar.isEmpty {
-            print("\(metar) ---- \(metarString)")
-        }
-
         self.flightRules = METAR.noaaFlightRules(ceilingAndVisibilityOK: self.ceilingAndVisibilityOK, cloudLayers: self.cloudLayers, visibility: self.visibility?.measurement)
     }
 
