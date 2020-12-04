@@ -106,7 +106,7 @@ public extension METAR {
         var metar = metar
 
         guard let loneSlashesRegularExpression = try? NSRegularExpression(pattern: "^(/)+") else { return nil }
-        guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z]{4})\\b") else { return nil }
+        guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z0-9]{4})\\b") else { return nil }
         guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
         guard let remarksRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
         guard let tempoBecomingRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(TEMPO|BECMG)(.*)") else { return nil }
@@ -124,7 +124,7 @@ public extension METAR {
         guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:([0-9]+) )?([0-9]+)/([0-9]{1})SM\\b") else { return nil }
         guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
-        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)R([0-9]{2}[L|C|R]?)\\/(?:(?:([P|M]?)([0-9]{4}))|(?:([0-9]{4})V([0-9]{4})))(FT)?(U|D|N)?\\b") else { return nil }
+        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(U|D|N)?\\b") else { return nil }
 
         // Lone Slashes Removal
 
@@ -242,24 +242,37 @@ public extension METAR {
 
         var rvrs = [RunwayVisualRange]()
         for match in metar.matches(for: rvrRegularExpression).reversed() {
-            guard let range = match[0], let runwayRange = match[1] else {
+            guard let range = match[0], let runwayRange = match[1], let visibilityValue = match[3].flatMap({ Double(String(metar[$0])) }) else {
                 continue
             }
 
             let unit: UnitLength = match[6].map { metar[$0] } == "FT" ? .feet : .meters
 
-            let visibility: RunwayVisualRange.Visibility
-            if let lower = match[4].flatMap({ Double(String(metar[$0])) }), let upper = match[5].flatMap({ Double(String(metar[$0])) }) {
-                visibility = .variable(.init(value: min(lower, upper), unit: unit), .init(value: max(lower, upper), unit: unit))
-            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "M" {
-                visibility = .lessThan(.init(value: value, unit: unit))
-            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "P" {
-                visibility = .greaterThan(.init(value: value, unit: unit))
-            } else if let value = match[3].flatMap({ Double(String(metar[$0])) }) {
-                visibility = .equal(.init(value: value, unit: unit))
-            } else {
-                continue
+            let visbilityModifier: RunwayVisualRange.Visibility.Modifier
+            switch match[2].map({ metar[$0] }) {
+            case "M":
+                visbilityModifier = .lessThan
+            case "P":
+                visbilityModifier = .greaterThan
+            default:
+                visbilityModifier = .equalTo
             }
+
+            let visibility = RunwayVisualRange.Visibility(modifier: visbilityModifier, measurement: .init(value: visibilityValue, unit: unit))
+
+            let variableVisibility: RunwayVisualRange.Visibility? = match[5].flatMap({ Double(String(metar[$0])) }).map { value in
+                let variableVisibilityModifier: RunwayVisualRange.Visibility.Modifier
+                switch match[4].map({ metar[$0] }) {
+                case "M":
+                    variableVisibilityModifier = .lessThan
+                case "P":
+                    variableVisibilityModifier = .greaterThan
+                default:
+                    variableVisibilityModifier = .equalTo
+                }
+                return .init(modifier: variableVisibilityModifier, measurement: .init(value: value, unit: unit))
+            }
+
 
             let trend: RunwayVisualRange.Trend?
             switch match[7].map({ metar[$0] }) {
@@ -273,7 +286,7 @@ public extension METAR {
                 trend = nil
             }
 
-            rvrs.append(.init(runway: String(metar[runwayRange]), visibility: visibility, trend: trend))
+            rvrs.append(.init(runway: String(metar[runwayRange]), visibility: visibility, variableVisibility: variableVisibility, trend: trend))
 
             metar.removeSubrange(range)
         }
@@ -640,22 +653,61 @@ public struct Visibility: Equatable {
 
 }
 
-public struct RunwayVisualRange: Equatable {
+public struct RunwayVisualRange: Equatable, CustomStringConvertible {
 
-    public enum Visibility: Equatable {
-        case lessThan(Measurement<UnitLength>)
-        case equal(Measurement<UnitLength>)
-        case greaterThan(Measurement<UnitLength>)
-        case variable(Measurement<UnitLength>, Measurement<UnitLength>)
+    public struct Visibility: Equatable, CustomStringConvertible {
+
+        public enum Modifier {
+            case lessThan, equalTo, greaterThan
+        }
+
+        public var modifier: Modifier = .equalTo
+        public var measurement: Measurement<UnitLength>
+
+        public var description: String {
+            switch modifier {
+            case .lessThan:
+                return "<\(measurement)"
+            case .equalTo:
+                return "\(measurement)"
+            case .greaterThan:
+                return ">\(measurement)"
+            }
+        }
     }
 
-    public enum Trend {
-        case increasing, decreasing, notChanging
+    public enum Trend: CustomStringConvertible {
+        case decreasing
+        case notChanging
+        case increasing
+
+        public var description: String {
+            switch self {
+            case .decreasing:
+                return "Decreasing"
+            case .notChanging:
+                return "Not Changing"
+            case .increasing:
+                return "Increasing"
+            }
+        }
     }
 
     public var runway: String
     public var visibility: Visibility
+    public var variableVisibility: Visibility?
     public var trend: Trend?
+
+    public var description: String {
+        var description = "Runway \(runway): \(visibility)"
+        if let variableVisibility = variableVisibility {
+            description += " – \(variableVisibility)"
+        }
+        if let trend = trend {
+            description += " \(trend)"
+        }
+        return description
+    }
 
 }
 
