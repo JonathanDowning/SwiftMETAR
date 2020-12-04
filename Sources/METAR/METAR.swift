@@ -12,7 +12,7 @@ public struct METAR: Equatable {
     public var identifier: String
     public var date: Date
     public var wind: Wind?
-    public var qnh: QNH?
+    public var qnh: Measurement<UnitPressure>?
     public var skyCondition: SkyCondition?
     public var cloudLayers: [CloudLayer] = []
     public var visibility: Visibility?
@@ -20,11 +20,11 @@ public struct METAR: Equatable {
     public var weather: [Weather] = []
     public var trends: [Forecast] = []
     public var militaryColourCode: MilitaryColourCode?
-    public var temperature: Temperature?
-    public var dewPoint: Temperature?
-    public var ceilingAndVisibilityOK = false
-    public var automaticStation = false
-    public var correction = false
+    public var temperature: Measurement<UnitTemperature>?
+    public var dewPoint: Measurement<UnitTemperature>?
+    public var isCeilingAndVisibilityOK = false
+    public var isAutomatic = false
+    public var isCorrection = false
     public var noSignificantChangesExpected = false
     public var remarks: String?
     public var metarString: String
@@ -36,8 +36,8 @@ extension METAR {
 
     public var relativeHumidity: Double? {
         guard
-            let temperature = temperature?.measurement.converted(to: .celsius).value,
-            let dewPoint = dewPoint?.measurement.converted(to: .celsius).value
+            let temperature = temperature?.converted(to: .celsius).value,
+            let dewPoint = dewPoint?.converted(to: .celsius).value
         else {
             return nil
         }
@@ -55,13 +55,13 @@ extension METAR {
 
         var ceiling = Double.greatestFiniteMagnitude
         for layer in cloudLayers {
-            if layer.coverage == .notReported, let height = layer.height?.measurement.converted(to: .feet).value, height <= 3000 {
+            if layer.coverage == .notReported, let height = layer.height?.converted(to: .feet).value, height <= 3000 {
                 return nil
             }
             guard layer.coverage == .overcast || layer.coverage == .skyObscured || layer.coverage == .broken else {
                 continue
             }
-            guard let height = layer.height?.measurement.converted(to: .feet).value else {
+            guard let height = layer.height?.converted(to: .feet).value else {
                 return nil
             }
             if ceiling > height {
@@ -95,7 +95,6 @@ public extension METAR {
     private init?(metar: String, fullMETAR: Bool = true) {
         var metar = metar
 
-        guard let loneSlashesRegularExpression = try? NSRegularExpression(pattern: "^(/)+") else { return nil }
         guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z0-9]{4})\\b") else { return nil }
         guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
         guard let remarksRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
@@ -117,17 +116,11 @@ public extension METAR {
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
         guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(?:/?(U|D|N))?\\b") else { return nil }
 
+        metarString = metar
+
         // Lone Slashes Removal
 
-        for match in metar.matches(for: loneSlashesRegularExpression).reversed() {
-            guard let range = match[0] else {
-                continue
-            }
-
-            metar.removeSubrange(range)
-        }
-
-        metarString = metar
+        metar = metar.split(separator: " ").filter { !$0.allSatisfy { $0 == "/" } }.joined(separator: " ")
 
         // MARK: ICAO
 
@@ -312,35 +305,35 @@ public extension METAR {
         // MARK: AUTO
 
         if let match = metar.matches(for: autoRegularExpression).first, let range = match[0] {
-            automaticStation = true
+            isAutomatic = true
             metar.removeSubrange(range)
         } else {
-            automaticStation = false
+            isAutomatic = false
         }
 
         // MARK: COR
 
         if let match = metar.matches(for: correctionRegularExpression).first, let range = match[0] {
-            correction = true
+            isCorrection = true
             metar.removeSubrange(range)
         } else {
-            correction = false
+            isCorrection = false
         }
 
         // MARK: CAVOK
 
         if let match = metar.matches(for: cavokRegularExpression).first, let range = match[0] {
-            ceilingAndVisibilityOK = true
+            isCeilingAndVisibilityOK = true
             metar.removeSubrange(range)
         } else {
-            ceilingAndVisibilityOK = false
+            isCeilingAndVisibilityOK = false
         }
 
         // MARK: Wind
 
-        if let match = metar.matches(for: windRegularExpression).first, let range = match[0], let directionRange = match[1], let conversionRange = match[4], let speedRange = match[2], let speed = Double(String(metar[speedRange])) {
+        if let match = metar.matches(for: windRegularExpression).first, let range = match[0], let direction = match[1].flatMap({ Double(String(metar[$0])) }), let conversionRange = match[4], let speedRange = match[2], let speed = Double(String(metar[speedRange])) {
 
-            let speedUnit: Wind.Speed.Unit
+            let speedUnit: UnitSpeed
 
             switch metar[conversionRange] {
             case "MPS":
@@ -351,11 +344,9 @@ public extension METAR {
                 speedUnit = .knots
             }
 
-            let directionString = String(metar[directionRange])
-
-            let gustSpeed: Wind.Speed?
+            let gustSpeed: Measurement<UnitSpeed>?
             if let gustRange = match[3], let gust = Double(String(metar[gustRange])) {
-                gustSpeed = Wind.Speed(value: gust, unit: speedUnit)
+                gustSpeed = .init(value: gust, unit: speedUnit)
             } else {
                 gustSpeed = nil
             }
@@ -363,12 +354,12 @@ public extension METAR {
             let variation: Wind.Variation?
 
             if let variationMinRange = match[5], let variationMaxRange = match[6], let min = Double(String(metar[variationMinRange])), let max = Double(String(metar[variationMaxRange])) {
-                variation = Wind.Variation(from: min, to: max)
+                variation = Wind.Variation(from: .init(value: min, unit: .degrees), to: .init(value: max, unit: .degrees))
             } else {
                 variation = nil
             }
 
-            wind = Wind(direction: Double(directionString), speed: Wind.Speed(value: speed, unit: speedUnit), gustSpeed: gustSpeed, variation: variation)
+            wind = Wind(direction: .init(value: direction, unit: .degrees), speed: .init(value: speed, unit: speedUnit), gustSpeed: gustSpeed, variation: variation)
 
             metar.removeSubrange(range)
         } else {
@@ -451,7 +442,7 @@ public extension METAR {
                     significantCloud = nil
                 }
 
-                return CloudLayer(coverage: coverage, height: cloudHeight.map { CloudLayer.Height(value: $0, unit: .feet) }, significantCloudType: significantCloud)
+                return CloudLayer(coverage: coverage, height: cloudHeight.map { .init(value: $0, unit: .feet) }, significantCloudType: significantCloud)
             }
 
             for match in cloudLayerMatches.reversed() {
@@ -471,14 +462,14 @@ public extension METAR {
             let dewPointIsNegative = match[3] != nil
             let dewPoint = rawDewPoint * (dewPointIsNegative ? -1 : 1)
 
-            self.temperature = Temperature(value: temperature)
-            self.dewPoint = Temperature(value: dewPoint)
+            self.temperature = .init(value: temperature, unit: .celsius)
+            self.dewPoint = .init(value: dewPoint, unit: .celsius)
 
             metar.removeSubrange(range)
         } else if let match = metar.matches(for: malformedTemperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], var temperature = Double(String(metar[temperatureRange])) {
             let temperatureIsNegative = match[1] != nil
             temperature *= (temperatureIsNegative ? -1 : 1)
-            self.temperature = Temperature(value: temperature)
+            self.temperature = .init(value: temperature, unit: .celsius)
             self.dewPoint = nil
             metar.removeSubrange(range)
         }
@@ -586,19 +577,16 @@ public extension METAR {
 
         // MARK: Pressure
 
-        if let match = metar.matches(for: pressureRegularExpression).first, let range = match[0] {
-
-            if let qnhRange = match[1], let qnh = Double(String(metar[qnhRange])) {
-                self.qnh = QNH(value: qnh, unit: .hectopascals)
-                metar.removeSubrange(range)
-            } else if let altimeterRange = match[2], let altimeter = Double(String(metar[altimeterRange])).map({ $0 / 100 }) {
-                self.qnh = QNH(value: altimeter, unit: .inchesOfMercury)
-                metar.removeSubrange(range)
+        for match in metar.matches(for: pressureRegularExpression).reversed() {
+            guard let range = match[0] else { continue }
+            let hPa = match[1].flatMap { Double(String(metar[$0])) }.map { Measurement(value: $0, unit: UnitPressure.hectopascals) }
+            let inHg = match[2].flatMap { Double(String(metar[$0])) }.map { Measurement(value: $0 / 100, unit: UnitPressure.inchesOfMercury) }
+            if qnh?.unit == .inchesOfMercury {
+                qnh = inHg ?? qnh
             } else {
-                qnh = nil
+                qnh = inHg ?? hPa ?? qnh
             }
-        } else {
-            qnh = nil
+            metar.removeSubrange(range)
         }
 
         metar = metar.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -606,38 +594,7 @@ public extension METAR {
             print(metar, "---------",  metarString)
         }
 
-        self.flightRules = METAR.noaaFlightRules(ceilingAndVisibilityOK: self.ceilingAndVisibilityOK, cloudLayers: self.cloudLayers, visibility: self.visibility?.measurement)
-    }
-
-}
-
-public struct QNH: Equatable {
-
-    enum Unit {
-        case hectopascals
-        case inchesOfMercury
-    }
-
-    let value: Double
-    let unit: Unit
-
-    public var measurement: Measurement<UnitPressure> {
-        switch unit {
-        case .hectopascals:
-            return Measurement(value: value, unit: .hectopascals)
-        case .inchesOfMercury:
-            return Measurement(value: value, unit: .inchesOfMercury)
-        }
-    }
-
-}
-
-public struct Temperature: Equatable {
-
-    let value: Double
-
-    public var measurement: Measurement<UnitTemperature> {
-        Measurement(value: value, unit: .celsius)
+        self.flightRules = METAR.noaaFlightRules(ceilingAndVisibilityOK: self.isCeilingAndVisibilityOK, cloudLayers: self.cloudLayers, visibility: self.visibility?.measurement)
     }
 
 }
@@ -702,41 +659,15 @@ public struct RunwayVisualRange: Equatable, CustomStringConvertible {
 
 public struct Wind: Equatable {
 
-    public struct Speed: Equatable {
-
-        public enum Unit {
-            case knots
-            case metersPerSecond
-            case kilometersPerHour
-        }
-
-        public var value: Double
-        public var unit: Unit
-
-        public var measurement: Measurement<UnitSpeed> {
-            switch unit {
-            case .knots:
-                return Measurement(value: value, unit: .knots)
-            case .metersPerSecond:
-                return Measurement(value: value, unit: .metersPerSecond)
-            case .kilometersPerHour:
-                return Measurement(value: value, unit: .kilometersPerHour)
-            }
-        }
-
-    }
-
-    public typealias Degrees = Double
-
-    public var direction: Degrees?
-    public var speed: Speed
-    public var gustSpeed: Speed?
-    public var variation: Variation?
-
     public struct Variation: Equatable {
-        public var from: Degrees
-        public var to: Degrees
+        public var from: Measurement<UnitAngle>
+        public var to: Measurement<UnitAngle>
     }
+
+    public var direction: Measurement<UnitAngle>?
+    public var speed: Measurement<UnitSpeed>
+    public var gustSpeed: Measurement<UnitSpeed>?
+    public var variation: Variation?
 
 }
 
@@ -749,28 +680,6 @@ public enum SkyCondition {
 
 public struct CloudLayer: Equatable {
 
-    public struct Height: Equatable {
-
-        enum Unit {
-            case feet
-        }
-
-        var value: Double
-        var unit: Unit
-
-        public var measurement: Measurement<UnitLength> {
-            switch unit {
-            case .feet:
-                return Measurement(value: value, unit: .feet)
-            }
-        }
-
-    }
-
-    public var coverage: Coverage
-    public var height: Height?
-    public var significantCloudType: SignificantCloudType?
-
     public enum Coverage {
         case few, scattered, broken, overcast, skyObscured, notReported
     }
@@ -778,6 +687,10 @@ public struct CloudLayer: Equatable {
     public enum SignificantCloudType {
         case cumulonimbus, toweringCumulus
     }
+
+    public var coverage: Coverage
+    public var height: Measurement<UnitLength>?
+    public var significantCloudType: SignificantCloudType?
 
 }
 
