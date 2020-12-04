@@ -106,7 +106,7 @@ public extension METAR {
         var metar = metar
 
         guard let loneSlashesRegularExpression = try? NSRegularExpression(pattern: "^(/)+") else { return nil }
-        guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z]{4})\\b") else { return nil }
+        guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z0-9]{4})\\b") else { return nil }
         guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
         guard let remarksRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
         guard let tempoBecomingRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(TEMPO|BECMG)(.*)") else { return nil }
@@ -249,14 +249,19 @@ public extension METAR {
             let unit: UnitLength = match[6].map { metar[$0] } == "FT" ? .feet : .meters
 
             let visibility: RunwayVisualRange.Visibility
+            let variableVisibility: RunwayVisualRange.Visibility?
             if let lower = match[4].flatMap({ Double(String(metar[$0])) }), let upper = match[5].flatMap({ Double(String(metar[$0])) }) {
-                visibility = .variable(.init(value: min(lower, upper), unit: unit), .init(value: max(lower, upper), unit: unit))
+                visibility = .init(measurement: .init(value: min(lower, upper), unit: unit))
+                variableVisibility = .init(measurement: .init(value: max(lower, upper), unit: unit))
             } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "M" {
-                visibility = .lessThan(.init(value: value, unit: unit))
+                visibility = .init(modifier: .lessThan, measurement: .init(value: value, unit: unit))
+                variableVisibility = nil
             } else if let value = match[3].flatMap({ Double(String(metar[$0])) }), match[2].map({ metar[$0] }) == "P" {
-                visibility = .greaterThan(.init(value: value, unit: unit))
+                visibility = .init(modifier: .greaterThan, measurement: .init(value: value, unit: unit))
+                variableVisibility = nil
             } else if let value = match[3].flatMap({ Double(String(metar[$0])) }) {
-                visibility = .equal(.init(value: value, unit: unit))
+                visibility = .init(measurement: .init(value: value, unit: unit))
+                variableVisibility = nil
             } else {
                 continue
             }
@@ -273,7 +278,7 @@ public extension METAR {
                 trend = nil
             }
 
-            rvrs.append(.init(runway: String(metar[runwayRange]), visibility: visibility, trend: trend))
+            rvrs.append(.init(runway: String(metar[runwayRange]), visibility: visibility, variableVisibility: variableVisibility, trend: trend))
 
             metar.removeSubrange(range)
         }
@@ -579,6 +584,12 @@ public extension METAR {
             qnh = nil
         }
 
+        metar = metar.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !metar.isEmpty {
+            print("\(metar) ---- \(metarString)")
+        }
+
         self.flightRules = METAR.noaaFlightRules(ceilingAndVisibilityOK: self.ceilingAndVisibilityOK, cloudLayers: self.cloudLayers, visibility: self.visibility?.measurement)
     }
 
@@ -642,11 +653,13 @@ public struct Visibility: Equatable {
 
 public struct RunwayVisualRange: Equatable {
 
-    public enum Visibility: Equatable {
-        case lessThan(Measurement<UnitLength>)
-        case equal(Measurement<UnitLength>)
-        case greaterThan(Measurement<UnitLength>)
-        case variable(Measurement<UnitLength>, Measurement<UnitLength>)
+    public struct Visibility: Equatable {
+        public enum Modifier {
+            case lessThan, equalTo, greaterThan
+        }
+
+        public var modifier: Modifier = .equalTo
+        public var measurement: Measurement<UnitLength>
     }
 
     public enum Trend {
@@ -655,6 +668,7 @@ public struct RunwayVisualRange: Equatable {
 
     public var runway: String
     public var visibility: Visibility
+    public var variableVisibility: Visibility?
     public var trend: Trend?
 
 }
