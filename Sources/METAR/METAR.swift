@@ -73,22 +73,12 @@ extension METAR {
             return .vfr
         }
 
-        if ceiling < 500 {
+        if visibility?.converted(to: .miles).value ?? .greatestFiniteMagnitude < 1 || ceiling < 500 {
             return .lifr
-        } else if ceiling < 1000 {
+        } else if visibility?.converted(to: .miles).value ?? .greatestFiniteMagnitude < 3 || ceiling < 1000 {
             return .ifr
-        } else if ceiling <= 3000 {
+        } else if visibility?.converted(to: .miles).value ?? .greatestFiniteMagnitude <= 5 || ceiling <= 3000 {
             return .mvfr
-        }
-
-        if let visibilityValue = visibility?.converted(to: .miles).value {
-            if visibilityValue < 1 {
-                return .lifr
-            } else if visibilityValue < 3 {
-                return .ifr
-            } else if visibilityValue <= 5 {
-                return .mvfr
-            }
         }
 
         return nil
@@ -111,6 +101,7 @@ public extension METAR {
         guard let remarksRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
         guard let tempoBecomingRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(TEMPO|BECMG)(.*)") else { return nil }
         guard let nosigRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)NOSIG\\b") else { return nil }
+        guard let cavokRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)CAVOK\\b") else { return nil }
         guard let militaryColorCodeRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(BLU|WHT|GRN|YLO1|YLO2|AMB|RED)\\b") else { return nil }
         guard let autoRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)AUTO\\b") else { return nil }
         guard let correctionRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)COR\\b") else { return nil }
@@ -119,12 +110,12 @@ public extension METAR {
         guard let cloudLayerRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(FEW|SCT|BKN|OVC|VV|///)([0-9]{3}|///)(?:///)?(CB|TCU|///)?") else { return nil }
         guard let temperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/(M)?([0-9]{2})\\b") else { return nil }
         guard let malformedTemperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/ ") else { return nil }
-        guard let visibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(CAVOK|[0-9]{4})(NDV)?\\b") else { return nil }
-        guard let metricVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]+)SM\\b") else { return nil }
-        guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:([0-9]+) )?([0-9]+)/([0-9]{1})SM\\b") else { return nil }
+        guard let visibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(M|P)?([0-9]{4}))(NDV)?\\b") else { return nil }
+        guard let metricVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?([0-9]+)SM\\b") else { return nil }
+        guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?(?:([0-9]+) )?([0-9]+)/([0-9]{1})SM\\b") else { return nil }
         guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
-        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(U|D|N)?\\b") else { return nil }
+        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(?:/?(U|D|N))?\\b") else { return nil }
 
         // Lone Slashes Removal
 
@@ -248,7 +239,7 @@ public extension METAR {
 
             let unit: UnitLength = match[6].map { metar[$0] } == "FT" ? .feet : .meters
 
-            let visbilityModifier: RunwayVisualRange.Visibility.Modifier
+            let visbilityModifier: Visibility.Modifier
             switch match[2].map({ metar[$0] }) {
             case "M":
                 visbilityModifier = .lessThan
@@ -258,10 +249,10 @@ public extension METAR {
                 visbilityModifier = .equalTo
             }
 
-            let visibility = RunwayVisualRange.Visibility(modifier: visbilityModifier, measurement: .init(value: visibilityValue, unit: unit))
+            let visibility = Visibility(modifier: visbilityModifier, measurement: .init(value: visibilityValue, unit: unit))
 
-            let variableVisibility: RunwayVisualRange.Visibility? = match[5].flatMap({ Double(String(metar[$0])) }).map { value in
-                let variableVisibilityModifier: RunwayVisualRange.Visibility.Modifier
+            let variableVisibility: Visibility? = match[5].flatMap({ Double(String(metar[$0])) }).map { value in
+                let variableVisibilityModifier: Visibility.Modifier
                 switch match[4].map({ metar[$0] }) {
                 case "M":
                     variableVisibilityModifier = .lessThan
@@ -334,6 +325,15 @@ public extension METAR {
             metar.removeSubrange(range)
         } else {
             correction = false
+        }
+
+        // MARK: CAVOK
+
+        if let match = metar.matches(for: cavokRegularExpression).first, let range = match[0] {
+            ceilingAndVisibilityOK = true
+            metar.removeSubrange(range)
+        } else {
+            ceilingAndVisibilityOK = false
         }
 
         // MARK: Wind
@@ -481,54 +481,63 @@ public extension METAR {
             self.temperature = Temperature(value: temperature)
             self.dewPoint = nil
             metar.removeSubrange(range)
-        } else {
-            self.temperature = nil
-            self.dewPoint = nil
         }
 
         // MARK: Visibility
 
-        let visibility: Visibility?
+        if let match = metar.matches(for: visibilityRegularExpression).first, let range = match[0] {
 
-        if let match = metar.matches(for: visibilityRegularExpression).first, let range = match[0], let visibilityRange = match[1] {
+            let modifier: Visibility.Modifier
+            switch match[1].map({ String(metar[$0]) }) {
+            case "M":
+                modifier = .lessThan
+            case "P":
+                modifier = .greaterThan
+            default:
+                modifier = .equalTo
+            }
 
-            let visibilityString = String(metar[visibilityRange])
-
-            if visibilityString == "CAVOK" {
-                visibility = nil
-                ceilingAndVisibilityOK = true
-            } else if visibilityString == "9999" {
-                visibility = Visibility(value: 10, unit: .kilometers, greaterThanOrEqual: true)
-                ceilingAndVisibilityOK = false
-            } else if let distance = Double(visibilityString) {
-                visibility = Visibility(value: distance, unit: .meters, greaterThanOrEqual: false)
-                ceilingAndVisibilityOK = false
+            if let value = match[2].flatMap({ Double(String(metar[$0])) }) {
+                if value == 9999 {
+                    visibility = .init(modifier: .greaterThan, measurement: .init(value: 10, unit: .kilometers))
+                } else {
+                    visibility = Visibility(modifier: modifier, measurement: .init(value: value, unit: .meters))
+                }
             } else {
                 visibility = nil
-                ceilingAndVisibilityOK = false
             }
 
             metar.removeSubrange(range)
-        } else if let match = metar.matches(for: metricVisibilityRegularExpression).first, let range = match[0], let visibilityRange = match[1], let distance = Double(String(metar[visibilityRange])) {
-            visibility = Visibility(value: distance, unit: .miles, greaterThanOrEqual: false)
-            ceilingAndVisibilityOK = false
+        } else if let match = metar.matches(for: metricVisibilityRegularExpression).first, let range = match[0], let visibilityRange = match[2], let distance = Double(String(metar[visibilityRange])) {
+            let modifier: Visibility.Modifier
+            switch match[1].map({ String(metar[$0]) }) {
+            case "M":
+                modifier = .lessThan
+            case "P":
+                modifier = .greaterThan
+            default:
+                modifier = .equalTo
+            }
+            visibility = Visibility(modifier: modifier, measurement: .init(value: distance, unit: .miles))
             metar.removeSubrange(range)
-        } else if let match = metar.matches(for: metricFractionVisibilityRegularExpression).first, let range = match[0], let numeratorRange = match[2], let denominatorRange = match[3], let numerator = Double(String(metar[numeratorRange])), let denominator = Double(String(metar[denominatorRange])), denominator > 0 {
+        } else if let match = metar.matches(for: metricFractionVisibilityRegularExpression).first, let range = match[0], let numeratorRange = match[3], let denominatorRange = match[4], let numerator = Double(String(metar[numeratorRange])), let denominator = Double(String(metar[denominatorRange])), denominator > 0 {
 
-            let wholeNumber = match[1].flatMap { Double(String(metar[$0])) } ?? 0
+            let wholeNumber = match[2].flatMap { Double(String(metar[$0])) } ?? 0
 
-            visibility = Visibility(value: numerator / denominator + wholeNumber, unit: .miles, greaterThanOrEqual: false)
+            let modifier: Visibility.Modifier
+            switch match[1].map({ String(metar[$0]) }) {
+            case "M":
+                modifier = .lessThan
+            case "P":
+                modifier = .greaterThan
+            default:
+                modifier = .equalTo
+            }
 
-            ceilingAndVisibilityOK = false
+            visibility = .init(modifier: modifier, measurement: .init(value: numerator / denominator + wholeNumber, unit: .miles))
 
             metar.removeSubrange(range)
-        } else {
-            ceilingAndVisibilityOK = false
-
-            visibility = nil
         }
-
-        self.visibility = visibility
 
         // MARK: Weather
 
@@ -592,6 +601,11 @@ public extension METAR {
             qnh = nil
         }
 
+        metar = metar.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !metar.isEmpty {
+            print(metar, "---------",  metarString)
+        }
+
         self.flightRules = METAR.noaaFlightRules(ceilingAndVisibilityOK: self.ceilingAndVisibilityOK, cloudLayers: self.cloudLayers, visibility: self.visibility?.measurement)
     }
 
@@ -628,53 +642,28 @@ public struct Temperature: Equatable {
 
 }
 
-public struct Visibility: Equatable {
+public struct Visibility: Equatable, CustomStringConvertible {
 
-    public enum Unit {
-        case kilometers
-        case meters
-        case miles
+    public enum Modifier {
+        case lessThan, equalTo, greaterThan
     }
 
-    public var value: Double
-    public var unit: Unit
-    public var greaterThanOrEqual = false
+    public var modifier: Modifier = .equalTo
+    public var measurement: Measurement<UnitLength>
 
-    public var measurement: Measurement<UnitLength> {
-        switch unit {
-        case .kilometers:
-            return Measurement(value: value, unit: .kilometers)
-        case .meters:
-            return Measurement(value: value, unit: .meters)
-        case .miles:
-            return Measurement(value: value, unit: .miles)
+    public var description: String {
+        switch modifier {
+        case .lessThan:
+            return "<\(measurement)"
+        case .equalTo:
+            return "\(measurement)"
+        case .greaterThan:
+            return ">\(measurement)"
         }
     }
-
 }
 
 public struct RunwayVisualRange: Equatable, CustomStringConvertible {
-
-    public struct Visibility: Equatable, CustomStringConvertible {
-
-        public enum Modifier {
-            case lessThan, equalTo, greaterThan
-        }
-
-        public var modifier: Modifier = .equalTo
-        public var measurement: Measurement<UnitLength>
-
-        public var description: String {
-            switch modifier {
-            case .lessThan:
-                return "<\(measurement)"
-            case .equalTo:
-                return "\(measurement)"
-            case .greaterThan:
-                return ">\(measurement)"
-            }
-        }
-    }
 
     public enum Trend: CustomStringConvertible {
         case decreasing
