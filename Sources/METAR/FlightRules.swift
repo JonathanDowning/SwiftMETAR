@@ -7,11 +7,13 @@
 
 import Foundation
 
-public enum NOAAFlightRules: String {
+public enum NOAAFlightRules {
+    
     case vfr
     case mvfr
     case ifr
     case lifr
+    
 }
 
 extension NOAAFlightRules {

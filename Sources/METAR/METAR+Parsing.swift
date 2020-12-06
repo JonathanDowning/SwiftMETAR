@@ -28,14 +28,16 @@ public extension METAR {
         guard let windRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{3}|VRB)([0-9]{2})(?:G([0-9]{2}))?(KT|MPS|KPH)(?: ([0-9]{3})V([0-9]{3}))?\\b") else { return nil }
         guard let cloudsRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(SKC|CLR|NSC|NCD)\\b") else { return nil }
         guard let cloudLayerRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(FEW|SCT|BKN|OVC|VV|///)([0-9]{3}|///)(?:///)?(CB|TCU|///)?") else { return nil }
-        guard let temperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/(M)?([0-9]{2})\\b") else { return nil }
+        guard let temperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/(?:(?:(M)?([0-9]{2}))|//)") else { return nil }
         guard let malformedTemperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/ ") else { return nil }
         guard let visibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(M|P)?([0-9]{4}))(NDV)?\\b") else { return nil }
-        guard let metricVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?([0-9]+)SM\\b") else { return nil }
-        guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?(?:([0-9]+) )?([0-9]+)/([0-9]{1})SM\\b") else { return nil }
+        guard let metricVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?([0-9]+)(SM|KM)\\b") else { return nil }
+        guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?(?:([0-9]+) )?([0-9]+)/([0-9]+)(SM|KM)\\b") else { return nil }
+        guard let directionalVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?([0-9]{4})(N|NE|E|SE|S|SW|W|NW)\\b") else { return nil }
         guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
         guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(?:/?(U|D|N))?\\b") else { return nil }
+        guard let runwayConditionRegularExpression = try? NSRegularExpression(pattern: #"R([0-9]{2}[L|C|R]?)\/(?:(?:(?:([0-9]{1}|\/)([0-9]{1}|\/)([0-9]{2}|\/\/)|(CLRD))([0-9]{2}))|(\/\/\/\/\/\/))"#) else { return nil }
 
         metarString = metar
 
@@ -92,13 +94,9 @@ public extension METAR {
 
             if !remarksString.isEmpty {
                 remarks = remarksString
-            } else {
-                remarks = nil
             }
 
             metar.removeSubrange(range)
-        } else {
-            remarks = nil
         }
 
         // MARK: TEMPO BECMG
@@ -134,7 +132,7 @@ public extension METAR {
             metar.removeSubrange(range)
         }
 
-        trend = forecasts.reversed()
+        trends = forecasts.reversed()
 
         if let match = metar.matches(for: nosigRegularExpression).first, let range = match[0] {
             noSignificantChangesExpected = true
@@ -143,7 +141,6 @@ public extension METAR {
 
         // MARK: Runway Visual Range
 
-        var rvrs = [RunwayVisualRange]()
         for match in metar.matches(for: rvrRegularExpression).reversed() {
             guard let range = match[0], let runwayRange = match[1], let visibilityValue = match[3].flatMap({ Double(String(metar[$0])) }) else {
                 continue
@@ -189,11 +186,166 @@ public extension METAR {
                 trend = nil
             }
 
-            rvrs.append(.init(runway: String(metar[runwayRange]), visibility: visibility, variableVisibility: variableVisibility, trend: trend))
+            runwayVisualRanges.insert(.init(runway: String(metar[runwayRange]), visibility: visibility, variableVisibility: variableVisibility, trend: trend), at: 0)
 
             metar.removeSubrange(range)
         }
-        self.runwayVisualRanges = rvrs.reversed()
+
+        // Runway Conditions
+
+        for match in metar.matches(for: runwayConditionRegularExpression).reversed() {
+            guard let range = match[0] else { continue }
+
+            let runwayDesignation: RunwayCondition.RunwayDesignation
+            if let runwayDesignationString = match[1].map({ String(metar[$0]) }) {
+                switch runwayDesignationString {
+                case "88":
+                    runwayDesignation = .allRunways
+                case "99":
+                    runwayDesignation = .previousRunwayReportRepeated
+                default:
+                    runwayDesignation = .runway(runwayDesignationString)
+                }
+            } else {
+                continue
+            }
+
+            guard match[7] == nil else {
+                runwayConditions.insert(.init(runwayDesignation: runwayDesignation, reportType: .reportNotUpdated), at: 0)
+                metar.removeSubrange(range)
+                continue
+            }
+
+            let brakingConditions: RunwayCondition.BrakingConditions
+            if let brakingConditionsNumber = match[6].flatMap({ Int(String(metar[$0])) }) {
+                switch brakingConditionsNumber {
+                case 1...90:
+                    brakingConditions = .frictionCoefficient(Double(brakingConditionsNumber) / 100)
+                case 91:
+                    brakingConditions = .poor
+                case 92:
+                    brakingConditions = .poorMedium
+                case 93:
+                    brakingConditions = .medium
+                case 94:
+                    brakingConditions = .mediumGood
+                case 95:
+                    brakingConditions = .good
+                case 99:
+                    brakingConditions = .unreliableOrNotMeasurable
+                default:
+                    continue
+                }
+            } else {
+                continue
+            }
+
+            guard match[5] == nil else {
+                runwayConditions.insert(.init(runwayDesignation: runwayDesignation, reportType: .contaiminationDisappeared(brakingConditions)), at: 0)
+                metar.removeSubrange(range)
+                continue
+            }
+
+            let depositType: RunwayCondition.DepositType
+            if let depositTypeString = match[2].map({ String(metar[$0]) }) {
+                if let depositTypeNumber = Int(depositTypeString) {
+                    switch depositTypeNumber {
+                    case 0:
+                        depositType = .clearAndDry
+                    case 1:
+                        depositType = .damp
+                    case 2:
+                        depositType = .wetOrWaterPatches
+                    case 3:
+                        depositType = .rimeOrFrost
+                    case 4:
+                        depositType = .drySnow
+                    case 5:
+                        depositType = .wetSnow
+                    case 6:
+                        depositType = .slush
+                    case 7:
+                        depositType = .ice
+                    case 8:
+                        depositType = .compactedOrRolledSnow
+                    case 9:
+                        depositType = .frozenRutsOrRidges
+                    default:
+                        continue
+                    }
+                } else if depositTypeString == "/" {
+                    depositType = .notReported
+                } else {
+                    continue
+                }
+            } else {
+                continue
+            }
+
+            let contaminationExtent: RunwayCondition.ContaminationExtent
+            if let contaminationExtentString = match[3].map({ String(metar[$0]) }) {
+                if let contaminationExtentNumber = Int(contaminationExtentString) {
+                    switch contaminationExtentNumber {
+                    case 1:
+                        contaminationExtent = .minimal
+                    case 2:
+                        contaminationExtent = .low
+                    case 5:
+                        contaminationExtent = .medium
+                    case 9:
+                        contaminationExtent = .high
+                    default:
+                        continue
+                    }
+                } else if contaminationExtentString == "/" {
+                    contaminationExtent = .notReported
+                } else {
+                    continue
+                }
+            } else {
+                continue
+            }
+
+            let depositDepth: RunwayCondition.DepositDepth
+            if let depositDepthString = match[4].map({ String(metar[$0]) }) {
+                if let depositDepthNumber = Int(depositDepthString) {
+                    switch depositDepthNumber {
+                    case 0:
+                        depositDepth = .minimal
+                    case 1...90:
+                        depositDepth = .depth(.init(value: Double(depositDepthNumber), unit: .millimeters))
+                    case 92:
+                        depositDepth = .depth(.init(value: 100, unit: .millimeters))
+                    case 93:
+                        depositDepth = .depth(.init(value: 150, unit: .millimeters))
+                    case 94:
+                        depositDepth = .depth(.init(value: 200, unit: .millimeters))
+                    case 95:
+                        depositDepth = .depth(.init(value: 250, unit: .millimeters))
+                    case 96:
+                        depositDepth = .depth(.init(value: 300, unit: .millimeters))
+                    case 97:
+                        depositDepth = .depth(.init(value: 350, unit: .millimeters))
+                    case 98:
+                        depositDepth = .depth(.init(value: 400, unit: .millimeters))
+                    case 99:
+                        depositDepth = .runwayNotOperational
+                    default:
+                        continue
+                    }
+                } else if depositDepthString == "//" {
+                    depositDepth = .depthNotSignificant
+                } else {
+                    continue
+                }
+            } else {
+                continue
+            }
+
+            runwayConditions.insert(.init(runwayDesignation: runwayDesignation, reportType: .default(depositType, contaminationExtent, depositDepth, brakingConditions)), at: 0)
+
+            metar.removeSubrange(range)
+        }
 
         // MARK: Military Colour Code
 
@@ -224,8 +376,6 @@ public extension METAR {
         if let match = metar.matches(for: autoRegularExpression).first, let range = match[0] {
             isAutomatic = true
             metar.removeSubrange(range)
-        } else {
-            isAutomatic = false
         }
 
         // MARK: COR
@@ -233,8 +383,6 @@ public extension METAR {
         if let match = metar.matches(for: correctionRegularExpression).first, let range = match[0] {
             isCorrection = true
             metar.removeSubrange(range)
-        } else {
-            isCorrection = false
         }
 
         // MARK: CAVOK
@@ -242,8 +390,6 @@ public extension METAR {
         if let match = metar.matches(for: cavokRegularExpression).first, let range = match[0] {
             isCeilingAndVisibilityOK = true
             metar.removeSubrange(range)
-        } else {
-            isCeilingAndVisibilityOK = false
         }
 
         // MARK: Wind
@@ -377,23 +523,21 @@ public extension METAR {
 
         // MARK: Temperatures
 
-        if let match = metar.matches(for: temperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], let rawTemperature = Double(String(metar[temperatureRange])), let dewPointRange = match[4], let rawDewPoint = Double(String(metar[dewPointRange])) {
+        if let match = metar.matches(for: temperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], let rawTemperature = Double(String(metar[temperatureRange])) {
 
             let temperatureIsNegative = match[1] != nil
             let temperature = rawTemperature * (temperatureIsNegative ? -1 : 1)
 
             let dewPointIsNegative = match[3] != nil
-            let dewPoint = rawDewPoint * (dewPointIsNegative ? -1 : 1)
+            dewPoint = match[4].flatMap { Double(String(metar[$0])) }.map { .init(value: $0 * (dewPointIsNegative ? -1 : 1), unit: .celsius) }
 
             self.temperature = .init(value: temperature, unit: .celsius)
-            self.dewPoint = .init(value: dewPoint, unit: .celsius)
 
             metar.removeSubrange(range)
         } else if let match = metar.matches(for: malformedTemperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], var temperature = Double(String(metar[temperatureRange])) {
             let temperatureIsNegative = match[1] != nil
             temperature *= (temperatureIsNegative ? -1 : 1)
             self.temperature = .init(value: temperature, unit: .celsius)
-            self.dewPoint = nil
             metar.removeSubrange(range)
         }
 
@@ -401,27 +545,24 @@ public extension METAR {
 
         if let match = metar.matches(for: visibilityRegularExpression).first, let range = match[0] {
 
-            let modifier: Visibility.Modifier
-            switch match[1].map({ String(metar[$0]) }) {
-            case "M":
-                modifier = .lessThan
-            case "P":
-                modifier = .greaterThan
-            default:
-                modifier = .equalTo
-            }
-
             if let value = match[2].flatMap({ Double(String(metar[$0])) }) {
+                let modifier: Visibility.Modifier
+                switch match[1].map({ String(metar[$0]) }) {
+                case "M":
+                    modifier = .lessThan
+                case "P":
+                    modifier = .greaterThan
+                default:
+                    modifier = .equalTo
+                }
                 if value == 9999 {
                     visibility = .init(modifier: .greaterThan, measurement: .init(value: 10, unit: .kilometers))
                 } else {
                     visibility = Visibility(modifier: modifier, measurement: .init(value: value, unit: .meters))
                 }
-            } else {
-                visibility = nil
+                metar.removeSubrange(range)
             }
 
-            metar.removeSubrange(range)
         } else if let match = metar.matches(for: metricVisibilityRegularExpression).first, let range = match[0], let visibilityRange = match[2], let distance = Double(String(metar[visibilityRange])) {
             let modifier: Visibility.Modifier
             switch match[1].map({ String(metar[$0]) }) {
@@ -432,7 +573,14 @@ public extension METAR {
             default:
                 modifier = .equalTo
             }
-            visibility = Visibility(modifier: modifier, measurement: .init(value: distance, unit: .miles))
+            switch match[3].map({ metar[$0] }) {
+            case "KM":
+                visibility = Visibility(modifier: modifier, measurement: .init(value: distance, unit: .kilometers))
+            case "SM":
+                visibility = Visibility(modifier: modifier, measurement: .init(value: distance, unit: .miles))
+            default:
+                break
+            }
             metar.removeSubrange(range)
         } else if let match = metar.matches(for: metricFractionVisibilityRegularExpression).first, let range = match[0], let numeratorRange = match[3], let denominatorRange = match[4], let numerator = Double(String(metar[numeratorRange])), let denominator = Double(String(metar[denominatorRange])), denominator > 0 {
 
@@ -448,7 +596,57 @@ public extension METAR {
                 modifier = .equalTo
             }
 
-            visibility = .init(modifier: modifier, measurement: .init(value: numerator / denominator + wholeNumber, unit: .miles))
+            switch match[5].map({ metar[$0] }) {
+            case "KM":
+                visibility = .init(modifier: modifier, measurement: .init(value: numerator / denominator + wholeNumber, unit: .kilometers))
+            case "SM":
+                visibility = .init(modifier: modifier, measurement: .init(value: numerator / denominator + wholeNumber, unit: .miles))
+            default:
+                break
+            }
+
+            metar.removeSubrange(range)
+        }
+
+        // MARK: Directional Visibilities
+
+        for match in metar.matches(for: directionalVisibilityRegularExpression).reversed() {
+            guard let range = match[0] else { continue }
+            guard let visibility = match[2].flatMap({ Double(String(metar[$0])) }) else { continue }
+
+            let modifier: Visibility.Modifier
+            switch match[1].map({ String(metar[$0]) }) {
+            case "M":
+                modifier = .lessThan
+            case "P":
+                modifier = .greaterThan
+            default:
+                modifier = .equalTo
+            }
+
+            let direction: DirectionalVisibility.Direction
+            switch match[3].map({ String(metar[$0]) }) {
+            case "N":
+                direction = .north
+            case "NE":
+                direction = .northEast
+            case "E":
+                direction = .east
+            case "SE":
+                direction = .southEast
+            case "S":
+                direction = .south
+            case "SW":
+                direction = .southWest
+            case "W":
+                direction = .west
+            case "NW":
+                direction = .northWest
+            default:
+                continue
+            }
+
+            directionalVisibilities.insert(.init(visibility: .init(modifier: modifier, measurement: .init(value: visibility, unit: .meters)), direction: direction), at: 0)
 
             metar.removeSubrange(range)
         }

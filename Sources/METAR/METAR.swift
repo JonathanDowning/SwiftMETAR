@@ -16,9 +16,11 @@ public struct METAR: Equatable {
     public var skyCondition: SkyCondition?
     public var cloudLayers: [CloudLayer] = []
     public var visibility: Visibility?
+    public var directionalVisibilities: [DirectionalVisibility] = []
+    public var runwayConditions: [RunwayCondition] = []
     public var runwayVisualRanges: [RunwayVisualRange] = []
     public var weather: [Weather] = []
-    public var trend: [Trend] = []
+    public var trends: [Trend] = []
     public var militaryColorCode: MilitaryColorCode?
     public var temperature: Measurement<UnitTemperature>?
     public var dewPoint: Measurement<UnitTemperature>?
