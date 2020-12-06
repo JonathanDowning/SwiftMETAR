@@ -10,25 +10,20 @@ import Foundation
 public extension METAR {
 
     init?(_ metar: String) {
-        self.init(metar: metar, fullMETAR: true)
+        self.init(metarString: metar, fullMETAR: true)
     }
 
-    private init?(metar: String, fullMETAR: Bool = true) {
-        var metar = metar
+    private init?(metarString: String, fullMETAR: Bool = true) {
+        var metar = metarString
 
         guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z0-9]{4})\\b") else { return nil }
         guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
-        guard let remarksRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)RMK(.*)") else { return nil }
         guard let tempoBecomingRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(TEMPO|BECMG)(.*)") else { return nil }
-        guard let nosigRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)NOSIG\\b") else { return nil }
-        guard let cavokRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)CAVOK\\b") else { return nil }
         guard let militaryColorCodeRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(BLU|WHT|GRN|YLO1|YLO2|AMB|RED)\\b") else { return nil }
-        guard let autoRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)AUTO\\b") else { return nil }
-        guard let correctionRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)COR\\b") else { return nil }
         guard let windRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{3}|VRB)([0-9]{2})(?:G(?:([0-9]{2})|//))?(KT|MPS|KPH)(?: ([0-9]{3})V([0-9]{3}))?\\b") else { return nil }
         guard let cloudsRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(SKC|CLR|NSC|NCD)\\b") else { return nil }
         guard let cloudLayerRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(FEW|SCT|BKN|OVC|VV|///)([0-9]{3}|///)(?:///)?(CB|TCU|///)?") else { return nil }
-        guard let temperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/(?:(?:(M)?([0-9]{2}))|//)") else { return nil }
+        guard let temperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/(?:(?:(M)?([0-9]{2}))|//)?") else { return nil }
         guard let malformedTemperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/ ") else { return nil }
         guard let visibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(M|P)?([0-9]{4}))(NDV)?\\b") else { return nil }
         guard let metricVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?([0-9]+)(SM|KM)\\b") else { return nil }
@@ -37,13 +32,7 @@ public extension METAR {
         guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
         guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
         guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(?:/?(U|D|N))?\\b") else { return nil }
-        guard let runwayConditionRegularExpression = try? NSRegularExpression(pattern: #"R([0-9]{2}[L|C|R]?)\/(?:(?:(?:([0-9]{1}|\/)([0-9]{1}|\/)([0-9]{2}|\/\/)|(CLRD))([0-9]{2}))|(\/\/\/\/\/\/))"#) else { return nil }
-
-        metarString = metar
-
-        // Lone Slashes Removal
-
-        metar = metar.split(separator: " ").filter { !$0.allSatisfy { $0 == "/" } }.joined(separator: " ")
+        guard let runwayConditionRegularExpression = try? NSRegularExpression(pattern: #"R([0-9]{2}[L|C|R]?)\/(?:(?:([0-9]{1}|\/)([0-9]{1}|\/)([0-9]{2}|\/\/)|(CLRD))(?:([0-9]{2})|\/\/))"#) else { return nil }
 
         // MARK: ICAO
 
@@ -74,15 +63,11 @@ public extension METAR {
 
         // MARK: Remarks
 
-        if let match = metar.matches(for: remarksRegularExpression).first, let range = match[0], let remarksRange = match[1] {
-
-            let remarksString = String(metar[remarksRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if !remarksString.isEmpty {
-                remarks = remarksString
-            }
-
-            metar.removeSubrange(range)
+        do {
+            let components = metar.components(separatedBy: " RMK")
+            metar = components.first ?? ""
+            let remarks = components.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            self.remarks = remarks.isEmpty ? nil : remarks
         }
 
         // MARK: TEMPO BECMG
@@ -100,7 +85,7 @@ public extension METAR {
 
             forecastString = forecastString.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            guard var forecastMETAR = METAR(metar: forecastString, fullMETAR: false) else {
+            guard var forecastMETAR = METAR(metarString: forecastString, fullMETAR: false) else {
                 continue
             }
             forecastMETAR.identifier = identifier
@@ -119,9 +104,23 @@ public extension METAR {
 
         trends = forecasts.reversed()
 
-        if let match = metar.matches(for: nosigRegularExpression).first, let range = match[0] {
-            noSignificantChangesExpected = true
-            metar.removeSubrange(range)
+        // MARK: AUTO / CAVOK / COR / NOSIG / Slashes
+
+        do {
+            let flags: [String: WritableKeyPath<Self, Bool>] = [
+                "AUTO": \.isAutomatic,
+                "CAVOK": \.isCeilingAndVisibilityOK,
+                "COR": \.isCorrection,
+                "NOSIG": \.noSignificantChangesExpected
+            ]
+            var components = metar.components(separatedBy: .whitespaces)
+            for (flag, keyPath) in flags {
+                self[keyPath: keyPath] = components.contains(flag)
+                components.removeAll { $0 == flag }
+            }
+
+            components.removeAll { $0.allSatisfy { $0 == "/" } }
+            metar = components.joined(separator: " ")
         }
 
         // MARK: Runway Visual Range
@@ -195,34 +194,32 @@ public extension METAR {
                 continue
             }
 
-            guard match[7] == nil else {
-                runwayConditions.insert(.init(runwayDesignation: runwayDesignation, reportType: .reportNotUpdated), at: 0)
-                metar.removeSubrange(range)
-                continue
-            }
-
             let brakingConditions: RunwayCondition.BrakingConditions
-            if let brakingConditionsNumber = match[6].flatMap({ Int(String(metar[$0])) }) {
-                switch brakingConditionsNumber {
-                case 1...90:
-                    brakingConditions = .frictionCoefficient(Double(brakingConditionsNumber) / 100)
-                case 91:
-                    brakingConditions = .poor
-                case 92:
-                    brakingConditions = .poorMedium
-                case 93:
-                    brakingConditions = .medium
-                case 94:
-                    brakingConditions = .mediumGood
-                case 95:
-                    brakingConditions = .good
-                case 99:
-                    brakingConditions = .unreliableOrNotMeasurable
-                default:
+            if let brakingConditionsString = match[6].flatMap({ String(metar[$0]) }) {
+                if let brakingConditionsNumber = Int(brakingConditionsString) {
+                    switch brakingConditionsNumber {
+                    case 1...90:
+                        brakingConditions = .frictionCoefficient(Double(brakingConditionsNumber) / 100)
+                    case 91:
+                        brakingConditions = .poor
+                    case 92:
+                        brakingConditions = .poorMedium
+                    case 93:
+                        brakingConditions = .medium
+                    case 94:
+                        brakingConditions = .mediumGood
+                    case 95:
+                        brakingConditions = .good
+                    case 99:
+                        brakingConditions = .unreliableOrNotMeasurable
+                    default:
+                        continue
+                    }
+                } else {
                     continue
                 }
             } else {
-                continue
+                brakingConditions = .notReported
             }
 
             guard match[5] == nil else {
@@ -327,7 +324,11 @@ public extension METAR {
                 continue
             }
 
-            runwayConditions.insert(.init(runwayDesignation: runwayDesignation, reportType: .default(depositType, contaminationExtent, depositDepth, brakingConditions)), at: 0)
+            if depositType == .notReported && contaminationExtent == .notReported && depositDepth == .depthNotSignificant && brakingConditions == .notReported {
+                runwayConditions.insert(.init(runwayDesignation: runwayDesignation, reportType: .reportNotUpdated), at: 0)
+            } else {
+                runwayConditions.insert(.init(runwayDesignation: runwayDesignation, reportType: .default(depositType, contaminationExtent, depositDepth, brakingConditions)), at: 0)
+            }
 
             metar.removeSubrange(range)
         }
@@ -353,27 +354,6 @@ public extension METAR {
             default:
                 break
             }
-            metar.removeSubrange(range)
-        }
-
-        // MARK: AUTO
-
-        if let match = metar.matches(for: autoRegularExpression).first, let range = match[0] {
-            isAutomatic = true
-            metar.removeSubrange(range)
-        }
-
-        // MARK: COR
-
-        if let match = metar.matches(for: correctionRegularExpression).first, let range = match[0] {
-            isCorrection = true
-            metar.removeSubrange(range)
-        }
-
-        // MARK: CAVOK
-
-        if let match = metar.matches(for: cavokRegularExpression).first, let range = match[0] {
-            isCeilingAndVisibilityOK = true
             metar.removeSubrange(range)
         }
 

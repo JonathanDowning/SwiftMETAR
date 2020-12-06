@@ -77,6 +77,7 @@ public struct RunwayCondition: Hashable {
         case mediumGood
         case good
         case unreliableOrNotMeasurable
+        case notReported
 
     }
 

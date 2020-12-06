@@ -29,7 +29,6 @@ public struct METAR: Hashable {
     public var isCorrection = false
     public var noSignificantChangesExpected = false
     public var remarks: String?
-    public var metarString: String
     public var noaaFlightRules: NOAAFlightRules?
 
 }
