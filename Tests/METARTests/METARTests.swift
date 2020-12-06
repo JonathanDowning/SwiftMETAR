@@ -126,9 +126,8 @@ final class METARTests: XCTestCase {
     private func compareMETAR(_ rawMETAR: String, _ identifier: String, _ day: Int, _ hour: Int, _ minute: Int, wind: Wind? = nil, qnh: Measurement<UnitPressure>? = nil, skyCondition: SkyCondition? = nil, cloudLayers: [CloudLayer] = [], visibility: Visibility? = nil, directionalVisibilities: [DirectionalVisibility] = [], conditons: [RunwayCondition] = [], rvrs: [RunwayVisualRange] = [], weather: [Weather] = [], trends: [Trend] = [], militaryColorCode: MilitaryColorCode? = nil, temperature: Double? = nil, dewPoint: Double? = nil, ceilingAndVisibilityOK: Bool = false, automaticStation: Bool = false, correction: Bool = false, noSignificantChangesExpected: Bool = false, remarks: String? = nil, flightRules: NOAAFlightRules? = nil) throws {
         try XCTAssertEqual(XCTUnwrap(METAR(rawMETAR)), XCTUnwrap(METAR(
             identifier: identifier,
-            dateComponents: DateComponents(day: day, hour: hour, minute: minute),
+            dateComponents: DateComponents(timeZone: TimeZone(identifier: "UTC"), day: day, hour: hour, minute: minute),
             wind: wind,
-            qnh: qnh,
             skyCondition: skyCondition,
             cloudLayers: cloudLayers,
             visibility: visibility,
@@ -140,6 +139,7 @@ final class METARTests: XCTestCase {
             militaryColorCode: militaryColorCode,
             temperature: temperature.map { .init(value: $0, unit: .celsius) },
             dewPoint: dewPoint.map { .init(value: $0, unit: .celsius) },
+            qnh: qnh,
             isCeilingAndVisibilityOK: ceilingAndVisibilityOK,
             isAutomatic: automaticStation,
             isCorrection: correction,

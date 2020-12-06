@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct Visibility: Equatable, CustomStringConvertible {
+public struct Visibility: Hashable, CustomStringConvertible {
 
     public enum Modifier {
         case lessThan, equalTo, greaterThan

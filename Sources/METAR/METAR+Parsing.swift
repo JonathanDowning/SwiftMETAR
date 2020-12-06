@@ -62,6 +62,7 @@ public extension METAR {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
 
+            dateComponents.timeZone = TimeZone(identifier: "UTC")!
             dateComponents.day = day
             dateComponents.hour = hour
             dateComponents.minute = minute

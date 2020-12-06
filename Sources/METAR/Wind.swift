@@ -7,14 +7,14 @@
 
 import Foundation
 
-public struct Wind: Equatable {
+public struct Wind: Hashable {
 
-    public enum Direction: Equatable {
+    public enum Direction: Hashable {
         case direction(Measurement<UnitAngle>)
         case variable
     }
 
-    public struct Variation: Equatable {
+    public struct Variation: Hashable {
         public var from: Measurement<UnitAngle>
         public var to: Measurement<UnitAngle>
     }

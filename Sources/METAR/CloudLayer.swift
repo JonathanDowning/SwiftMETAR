@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct CloudLayer: Equatable {
+public struct CloudLayer: Hashable {
 
     public enum Coverage {
         case few

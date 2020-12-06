@@ -7,12 +7,11 @@
 
 import Foundation
 
-public struct METAR: Equatable {
+public struct METAR: Hashable {
 
     public var identifier: String
     public var dateComponents = DateComponents()
     public var wind: Wind?
-    public var qnh: Measurement<UnitPressure>?
     public var skyCondition: SkyCondition?
     public var cloudLayers: [CloudLayer] = []
     public var visibility: Visibility?
@@ -24,6 +23,7 @@ public struct METAR: Equatable {
     public var militaryColorCode: MilitaryColorCode?
     public var temperature: Measurement<UnitTemperature>?
     public var dewPoint: Measurement<UnitTemperature>?
+    public var qnh: Measurement<UnitPressure>?
     public var isCeilingAndVisibilityOK = false
     public var isAutomatic = false
     public var isCorrection = false

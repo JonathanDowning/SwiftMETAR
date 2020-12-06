@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct RunwayVisualRange: Equatable, CustomStringConvertible {
+public struct RunwayVisualRange: Hashable, CustomStringConvertible {
 
     public enum Trend: CustomStringConvertible {
         case decreasing

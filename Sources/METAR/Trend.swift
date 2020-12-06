@@ -5,7 +5,7 @@
 //  Created by Jonathan Downing on 12/4/20.
 //
 
-public struct Trend: Equatable {
+public struct Trend: Hashable {
 
     public enum `Type` {
         case becoming, temporaryForecast

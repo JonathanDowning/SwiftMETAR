@@ -5,7 +5,7 @@
 //  Created by Jonathan Downing on 12/5/20.
 //
 
-public struct Weather: Equatable {
+public struct Weather: Hashable {
 
     public enum Modifier {
         case light

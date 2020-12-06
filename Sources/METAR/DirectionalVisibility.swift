@@ -5,7 +5,7 @@
 //  Created by Jonathan Downing on 12/5/20.
 //
 
-public struct DirectionalVisibility: Equatable {
+public struct DirectionalVisibility: Hashable {
     
     public enum Direction {
         case north

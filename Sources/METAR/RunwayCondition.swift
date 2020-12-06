@@ -7,9 +7,9 @@
 
 import Foundation
 
-public struct RunwayCondition: Equatable {
+public struct RunwayCondition: Hashable {
 
-    public enum RunwayDesignation: Equatable {
+    public enum RunwayDesignation: Hashable {
 
         case runway(String)
         case allRunways
@@ -52,7 +52,7 @@ public struct RunwayCondition: Equatable {
 
     }
 
-    public enum DepositDepth: Equatable {
+    public enum DepositDepth: Hashable {
 
         /// Less than 1mm
         case minimal
@@ -68,7 +68,7 @@ public struct RunwayCondition: Equatable {
 
     }
 
-    public enum BrakingConditions: Equatable {
+    public enum BrakingConditions: Hashable {
 
         case frictionCoefficient(Double)
         case poor
@@ -80,7 +80,7 @@ public struct RunwayCondition: Equatable {
 
     }
 
-    public enum ReportType: Equatable {
+    public enum ReportType: Hashable {
         case airportClosedDueToSnow
         case contaiminationDisappeared(BrakingConditions)
         case `default`(DepositType, ContaminationExtent, DepositDepth, BrakingConditions)
