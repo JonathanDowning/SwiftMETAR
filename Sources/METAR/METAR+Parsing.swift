@@ -34,6 +34,15 @@ public extension METAR {
         guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(?:/?(U|D|N))?\\b") else { return nil }
         guard let runwayConditionRegularExpression = try? NSRegularExpression(pattern: #"R([0-9]{2}[L|C|R]?)\/(?:(?:([0-9]{1}|\/)([0-9]{1}|\/)([0-9]{2}|\/\/)|(CLRD))(?:([0-9]{2})|\/\/))"#) else { return nil }
 
+        // MARK: Remarks
+
+        do {
+            let components = metar.components(separatedBy: " RMK")
+            metar = components.first ?? ""
+            let remarks = components.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            self.remarks = remarks.isEmpty ? nil : remarks
+        }
+
         // MARK: ICAO
 
         if let match = metar.matches(for: icaoRegularExpression).first, let range = match[0], let identifierRange = match[2], fullMETAR {
@@ -59,15 +68,6 @@ public extension METAR {
             metar.removeSubrange(dateStringRange)
         } else if fullMETAR {
             return nil
-        }
-
-        // MARK: Remarks
-
-        do {
-            let components = metar.components(separatedBy: " RMK")
-            metar = components.first ?? ""
-            let remarks = components.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-            self.remarks = remarks.isEmpty ? nil : remarks
         }
 
         // MARK: TEMPO BECMG
@@ -370,7 +370,6 @@ public extension METAR {
             }
 
             let speedUnit: UnitSpeed
-
             switch metar[conversionRange] {
             case "MPS":
                 speedUnit = .metersPerSecond
@@ -380,22 +379,17 @@ public extension METAR {
                 speedUnit = .knots
             }
 
-            let gustSpeed: Measurement<UnitSpeed>?
-            if let gustRange = match[3], let gust = Double(String(metar[gustRange])) {
-                gustSpeed = .init(value: gust, unit: speedUnit)
-            } else {
-                gustSpeed = nil
-            }
-
-            let variation: Wind.Variation?
-
+            var variation: Wind.Variation?
             if let variationMinRange = match[5], let variationMaxRange = match[6], let min = Double(String(metar[variationMinRange])), let max = Double(String(metar[variationMaxRange])) {
                 variation = Wind.Variation(from: .init(value: min, unit: .degrees), to: .init(value: max, unit: .degrees))
-            } else {
-                variation = nil
             }
 
-            wind = Wind(direction: direction, speed: .init(value: speed, unit: speedUnit), gustSpeed: gustSpeed, variation: variation)
+            wind = .init(
+                direction: direction,
+                speed: .init(value: speed, unit: speedUnit),
+                gustSpeed: match[3].flatMap({ Double(String(metar[$0])) }).map { .init(value: $0, unit: speedUnit) },
+                variation: variation
+            )
 
             metar.removeSubrange(range)
         }
@@ -414,16 +408,12 @@ public extension METAR {
             case "NCD":
                 skyCondition = .noCloudDetected
             default:
-                skyCondition = nil
+                break
             }
-
-            cloudLayers = []
 
             metar.removeSubrange(range)
         } else {
             let cloudLayerMatches = metar.matches(for: cloudLayerRegularExpression)
-
-            skyCondition = nil
 
             cloudLayers = cloudLayerMatches.compactMap { match in
 
@@ -440,12 +430,9 @@ public extension METAR {
                     significantCloudTypeString = nil
                 }
 
-                let cloudHeight: Double?
-
+                var cloudHeight: Double?
                 if let heightRange = match[2], let height = Double(String(metar[heightRange])) {
                     cloudHeight = height * 100
-                } else {
-                    cloudHeight = nil
                 }
 
                 let coverage: CloudLayer.Coverage
