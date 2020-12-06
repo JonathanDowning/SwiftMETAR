@@ -1,6 +1,6 @@
-# METAR
+# METAR Parser for Swift
 
-This is a simple regular expression based METAR parser.
+SwiftMETAR provides a simple way to parse METARs into Swift types.
 
 ## Usage Example
 
@@ -14,3 +14,11 @@ print(metar?.qnh?.measurement) // Prints: Optional(1024.0 hPa)
 print(metar?.wind?.speed.measurement) // Prints: Optional(5.0 kn)
 print(metar?.runwayVisualRanges) // Prints: Optional([Runway 04: 1300.0 m – >2000.0 m Increasing])
 ```
+
+## Contribution
+
+If you'd like to contribute, please feel free to create a PR.
+
+## License
+
+SwiftMETAR is available under the MIT license. See the LICENSE file for more info.
