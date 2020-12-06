@@ -51,6 +51,11 @@ final class METARTests: XCTestCase {
 
     func testInvalidMETARs() {
         XCTAssertNil(METAR("KRDU 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+        XCTAssertNil(METAR("012345Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+        XCTAssertNil(METAR("RDU 012345Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+        XCTAssertNil(METAR("KRDU 12345Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+        XCTAssertNil(METAR("KRDU 0123456Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+        XCTAssertNil(METAR("KRDU 012345 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
     }
 
     func testNOAAFlightRules() throws {
@@ -59,55 +64,19 @@ final class METARTests: XCTestCase {
         try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z OVC010")).noaaFlightRules, .mvfr)
         try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z OVC030")).noaaFlightRules, .mvfr)
         try XCTAssertNil(XCTUnwrap(METAR("ABCD 012345Z OVC031")).noaaFlightRules)
-    }
-
-    func testLIFRVisibility() throws {
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 1/8SM")).noaaFlightRules, .lifr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 1/4SM")).noaaFlightRules, .lifr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 1/2SM")).noaaFlightRules, .lifr)
-        try XCTAssertNotEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 1SM")).noaaFlightRules, .lifr)
-    }
-
-    func testLIFRCeiling() throws {
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC001 10SM")).noaaFlightRules, .lifr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC002 10SM")).noaaFlightRules, .lifr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC003 10SM")).noaaFlightRules, .lifr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC004 10SM")).noaaFlightRules, .lifr)
-        try XCTAssertNotEqual(XCTUnwrap(METAR("EGGD 121212Z OVC005 10SM")).noaaFlightRules, .lifr)
-    }
-
-    func testIFRVisibility() throws {
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 1SM")).noaaFlightRules, .ifr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 2SM")).noaaFlightRules, .ifr)
-        try XCTAssertNotEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 3SM")).noaaFlightRules, .ifr)
-    }
-
-    func testIFRCeiling() throws {
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC005 10SM")).noaaFlightRules, .ifr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC009 10SM")).noaaFlightRules, .ifr)
-        try XCTAssertNotEqual(XCTUnwrap(METAR("EGGD 121212Z OVC010 10SM")).noaaFlightRules, .ifr)
-    }
-
-    func testMVFRVisibility() throws {
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 3SM")).noaaFlightRules, .mvfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 4SM")).noaaFlightRules, .mvfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 5SM")).noaaFlightRules, .mvfr)
-        try XCTAssertNotEqual(XCTUnwrap(METAR("EGGD 121212Z FEW010 5 1/8SM")).noaaFlightRules, .mvfr)
-    }
-
-    func testMVFRCeiling() throws {
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC010 10SM")).noaaFlightRules, .mvfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC020 10SM")).noaaFlightRules, .mvfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z OVC030 10SM")).noaaFlightRules, .mvfr)
-        try XCTAssertNotEqual(XCTUnwrap(METAR("EGGD 121212Z OVC031 10SM")).noaaFlightRules, .mvfr)
-    }
-
-    func testVFR() throws {
-        try XCTAssertEqual(XCTUnwrap(METAR("EKTE 211720Z AUTO 22011KT 9999NDV NCD 11/10 Q1026=")).noaaFlightRules, .vfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z 10SM")).noaaFlightRules, .vfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z CAVOK")).noaaFlightRules, .vfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z SCT010 9999")).noaaFlightRules, .vfr)
-        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z ///010 10SM")).noaaFlightRules, .vfr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 1/2SM")).noaaFlightRules, .lifr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 1SM")).noaaFlightRules, .ifr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 3SM")).noaaFlightRules, .mvfr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 6SM")).noaaFlightRules, .vfr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 1SM CAVOK")).noaaFlightRules, .ifr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z CAVOK")).noaaFlightRules, .vfr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 10SM OVC004")).noaaFlightRules, .lifr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 1/2SM FEW100")).noaaFlightRules, .lifr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 10SM OVC005")).noaaFlightRules, .ifr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 1SM FEW100")).noaaFlightRules, .ifr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 10SM OVC010")).noaaFlightRules, .mvfr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 3SM FEW100")).noaaFlightRules, .mvfr)
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 6SM FEW100")).noaaFlightRules, .vfr)
     }
 
     func testWindGusts() throws {
