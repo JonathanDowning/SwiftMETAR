@@ -765,7 +765,38 @@ public extension METAR {
             print(metar, "---------",  metarString)
         }
 
-        flightRules = NOAAFlightRules(ceilingAndVisibilityOK: isCeilingAndVisibilityOK, cloudLayers: cloudLayers, visibility: visibility?.measurement)
+        // MARK: NOAA Flight Rules
+
+        noaaFlightRules = {
+            if ceiling.converted(to: .feet).value < 500 {
+                return .lifr
+            }
+            if let visibility = visibility?.measurement.converted(to: .miles).value, visibility < 1 {
+                return .lifr
+            }
+            if ceiling.converted(to: .feet).value < 1000 {
+                return .ifr
+            }
+            if let visibility = visibility?.measurement.converted(to: .miles).value, visibility < 3 {
+                return .ifr
+            }
+            if ceiling.converted(to: .feet).value <= 3000 {
+                return .mvfr
+            }
+            if let visibility = visibility?.measurement.converted(to: .miles).value, visibility <= 5 {
+                return .mvfr
+            }
+            if let visibility = visibility?.measurement.converted(to: .miles).value, visibility > 5, ceiling.converted(to: .feet).value > 3000 {
+                return .vfr
+            }
+            if let skyCondition = skyCondition, [SkyCondition.clear, .noCloudDetected, .noSignificantCloud, .skyClear].contains(skyCondition){
+                return .vfr
+            }
+            if isCeilingAndVisibilityOK {
+                return .vfr
+            }
+            return nil
+        }()
     }
 
 }

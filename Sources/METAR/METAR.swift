@@ -19,17 +19,17 @@ public struct METAR: Hashable {
     public var runwayConditions: [RunwayCondition] = []
     public var runwayVisualRanges: [RunwayVisualRange] = []
     public var weather: [Weather] = []
-    public var trends: [Trend] = []
-    public var militaryColorCode: MilitaryColorCode?
     public var temperature: Measurement<UnitTemperature>?
     public var dewPoint: Measurement<UnitTemperature>?
     public var qnh: Measurement<UnitPressure>?
+    public var trends: [Trend] = []
+    public var militaryColorCode: MilitaryColorCode?
     public var isCeilingAndVisibilityOK = false
     public var isAutomatic = false
     public var isCorrection = false
     public var noSignificantChangesExpected = false
     public var remarks: String?
     public var metarString: String
-    public var flightRules: NOAAFlightRules?
+    public var noaaFlightRules: NOAAFlightRules?
 
 }
