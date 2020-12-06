@@ -9,8 +9,8 @@ import Foundation
 
 public extension METAR {
 
-    init?(rawMETAR: String) {
-        self.init(metar: rawMETAR, fullMETAR: true)
+    init?(_ metar: String) {
+        self.init(metar: metar, fullMETAR: true)
     }
 
     private init?(metar: String, fullMETAR: Bool = true) {
@@ -62,28 +62,13 @@ public extension METAR {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
 
-            var dateComponents = calendar.dateComponents([.year, .month, .day, .timeZone], from: Date())
-
-            let currentDay = dateComponents.day!
-
             dateComponents.day = day
             dateComponents.hour = hour
             dateComponents.minute = minute
 
-            if let day = dateComponents.day, currentDay < day, let month = dateComponents.month {
-                dateComponents.month = month - 1
-            }
-
-            if let date = calendar.date(from: dateComponents) {
-                self.date = date
-                metar.removeSubrange(dateStringRange)
-            } else {
-                return nil
-            }
+            metar.removeSubrange(dateStringRange)
         } else if fullMETAR {
             return nil
-        } else {
-            date = Date()
         }
 
         // MARK: Remarks
@@ -118,7 +103,6 @@ public extension METAR {
                 continue
             }
             forecastMETAR.identifier = identifier
-            forecastMETAR.date = date
 
             switch metar[forecastRange] {
             case "BECMG":

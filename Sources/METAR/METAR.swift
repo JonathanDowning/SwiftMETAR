@@ -10,7 +10,7 @@ import Foundation
 public struct METAR: Equatable {
 
     public var identifier: String
-    public var date: Date
+    public var dateComponents = DateComponents()
     public var wind: Wind?
     public var qnh: Measurement<UnitPressure>?
     public var skyCondition: SkyCondition?
