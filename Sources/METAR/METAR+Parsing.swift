@@ -86,7 +86,6 @@ extension METAR {
 
             let flags = [
                 "AUTO": \METAR.isAutomatic,
-                "CAVOK": \.isCeilingAndVisibilityOK,
                 "COR": \.isCorrection
             ]
             for (flag, keyPath) in flags {
@@ -385,7 +384,7 @@ extension METAR {
 
         // MARK: Clouds
 
-        if let match = metar.matches(for: #"(?<!\S)(SKC|CLR|NSC|NCD)\b"#).first, let range = match[0], let cloudStringRange = match[1] {
+        if let match = metar.matches(for: #"(?<!\S)(SKC|CLR|NSC|NCD|CAVOK)\b"#).first, let range = match[0], let cloudStringRange = match[1] {
 
             switch metar[cloudStringRange] {
             case "SKC":
@@ -396,6 +395,8 @@ extension METAR {
                 skyCondition = .noSignificantCloud
             case "NCD":
                 skyCondition = .noCloudDetected
+            case "CAVOK":
+                skyCondition = .ceilingAndVisibilityOK
             default:
                 break
             }
