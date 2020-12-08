@@ -7,6 +7,7 @@
 
 public enum SkyCondition {
 
+    case ceilingAndVisibilityOK
     case clear
     case noCloudDetected
     case noSignificantCloud

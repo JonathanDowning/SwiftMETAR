@@ -24,10 +24,8 @@ public struct METAR: Hashable {
     public var qnh: Measurement<UnitPressure>?
     public var trends: [Trend] = []
     public var militaryColorCode: MilitaryColorCode?
-    public var isCeilingAndVisibilityOK = false
     public var isAutomatic = false
     public var isCorrection = false
-    public var noSignificantChangesExpected = false
     public var remarks: String?
 
 }

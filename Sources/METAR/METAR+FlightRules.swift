@@ -41,7 +41,7 @@ extension METAR {
         if let visibility = visibility?.measurement.converted(to: .miles).value, visibility > 5, ceiling.converted(to: .feet).value > 3000 {
             return .vfr
         }
-        if isCeilingAndVisibilityOK {
+        if skyCondition == .ceilingAndVisibilityOK {
             return .vfr
         }
         return nil
