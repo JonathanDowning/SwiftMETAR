@@ -10,29 +10,11 @@ import Foundation
 extension METAR {
 
     public init?(_ metar: String) {
-        self.init(metarString: metar, fullMETAR: true)
+        self.init(metarString: metar)
     }
 
-    private init?(metarString: String, fullMETAR: Bool = true) {
+    private init?(metarString: String, identifier: String? = nil) {
         var metar = metarString
-
-        guard let icaoRegularExpression = try? NSRegularExpression(pattern: "(.*?)([A-Z0-9]{4})\\b") else { return nil }
-        guard let dateRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\\b") else { return nil }
-        guard let tempoBecomingRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(TEMPO|BECMG)(.*)") else { return nil }
-        guard let militaryColorCodeRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(BLU|WHT|GRN|YLO1|YLO2|AMB|RED)\\b") else { return nil }
-        guard let windRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)([0-9]{3}|VRB)([0-9]{2})(?:G(?:([0-9]{2})|//))?(KT|MPS|KPH)(?: ([0-9]{3})V([0-9]{3}))?\\b") else { return nil }
-        guard let cloudsRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(SKC|CLR|NSC|NCD)\\b") else { return nil }
-        guard let cloudLayerRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(FEW|SCT|BKN|OVC|VV|///)([0-9]{3}|///)(?:///)?(CB|TCU|///)?") else { return nil }
-        guard let temperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/(?:(?:(M)?([0-9]{2}))|//)?") else { return nil }
-        guard let malformedTemperatureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M)?([0-9]{2})/ ") else { return nil }
-        guard let visibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(M|P)?([0-9]{4}))(NDV)?\\b") else { return nil }
-        guard let metricVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?([0-9]+)(SM|KM)\\b") else { return nil }
-        guard let metricFractionVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?(?:([0-9]+) )?([0-9]+)/([0-9]+)(SM|KM)\\b") else { return nil }
-        guard let directionalVisibilityRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(M|P)?([0-9]{4})(N|NE|E|SE|S|SW|W|NW)\\b") else { return nil }
-        guard let weatherRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(-|\\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\\b") else { return nil }
-        guard let pressureRegularExpression = try? NSRegularExpression(pattern: "(?<!\\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\\b") else { return nil }
-        guard let rvrRegularExpression = try? NSRegularExpression(pattern: "\\bR([0-9]{2}[L|C|R]?)\\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(?:/?(U|D|N))?\\b") else { return nil }
-        guard let runwayConditionRegularExpression = try? NSRegularExpression(pattern: #"R([0-9]{2}[L|C|R]?)\/(?:(?:([0-9]{1}|\/)([0-9]{1}|\/)([0-9]{2}|\/\/)|(CLRD))(?:([0-9]{2})|\/\/))"#) else { return nil }
 
         // MARK: Remarks
 
@@ -45,87 +27,81 @@ extension METAR {
 
         // MARK: ICAO
 
-        if let match = metar.matches(for: icaoRegularExpression).first, let range = match[0], let identifierRange = match[2], fullMETAR {
-            identifier = String(metar[identifierRange])
+        if let identifier = identifier {
+            self.identifier = identifier
+        } else if let match = metar.matches(for: #"(.*?)([A-Z0-9]{4})\b"#).first, let range = match[0], let identifierRange = match[2] {
+            self.identifier = String(metar[identifierRange])
             metar.removeSubrange(range)
-        } else if fullMETAR {
-            return nil
         } else {
-            identifier = ""
+            return nil
         }
 
         // MARK: Date
 
-        if let match = metar.matches(for: dateRegularExpression).first, let timeZone = TimeZone(identifier: "UTC"), let dateStringRange = match[0], let dayRange = match[1], let hourRange = match[2], let minuteRange = match[3], let day = Int(String(metar[dayRange])), let hour = Int(String(metar[hourRange])), let minute = Int(String(metar[minuteRange])) {
+        if let match = metar.matches(for: #"(?<!\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\b"#).first, let timeZone = TimeZone(identifier: "UTC"), let dateStringRange = match[0], let dayRange = match[1], let hourRange = match[2], let minuteRange = match[3], let day = Int(String(metar[dayRange])), let hour = Int(String(metar[hourRange])), let minute = Int(String(metar[minuteRange])) {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
 
-            dateComponents.timeZone = TimeZone(identifier: "UTC")!
-            dateComponents.day = day
-            dateComponents.hour = hour
-            dateComponents.minute = minute
+            self.dateComponents.timeZone = TimeZone(identifier: "UTC")!
+            self.dateComponents.day = day
+            self.dateComponents.hour = hour
+            self.dateComponents.minute = minute
 
             metar.removeSubrange(dateStringRange)
-        } else if fullMETAR {
+        } else if identifier == nil {
             return nil
         }
 
         // MARK: TEMPO BECMG
 
-        var forecasts = [Trend]()
-
-        for match in metar.matches(for: tempoBecomingRegularExpression).reversed() {
-            guard let range = match[0], let forecastRange = match[1] else {
+        for match in metar.matches(for: #"(?<!\S)(TEMPO|BECMG|NOSIG)(.*)"#).reversed() {
+            guard let range = match[0], let forecastRange = match[1], let forecastString = match[2].map({ String(metar[$0] )}) else {
                 continue
             }
-
-            var forecastString = String(metar[range])
-
-            forecastString.removeSubrange(forecastString.startIndex..<forecastString.index(forecastString.startIndex, offsetBy: 5))
-
-            forecastString = forecastString.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard var forecastMETAR = METAR(metarString: forecastString, fullMETAR: false) else {
-                continue
-            }
-            forecastMETAR.identifier = identifier
 
             switch metar[forecastRange] {
             case "BECMG":
-                forecasts.append(.init(metarRepresentation: forecastMETAR, type: .becoming))
+                guard let forecastMETAR = METAR(metarString: forecastString, identifier: self.identifier) else {
+                    continue
+                }
+                trends.insert(.becoming(forecastMETAR), at: 0)
             case "TEMPO":
-                forecasts.append(.init(metarRepresentation: forecastMETAR, type: .temporaryForecast))
+                guard let forecastMETAR = METAR(metarString: forecastString, identifier: self.identifier) else {
+                    continue
+                }
+                trends.insert(.temporary(forecastMETAR), at: 0)
+            case "NOSIG":
+                trends.insert(.noSignificantChangeExpected, at: 0)
             default:
-                break
+                continue
             }
 
             metar.removeSubrange(range)
         }
 
-        trends = forecasts.reversed()
-
         // MARK: AUTO / CAVOK / COR / NOSIG / Slashes
 
         do {
-            let flags: [String: WritableKeyPath<Self, Bool>] = [
-                "AUTO": \.isAutomatic,
-                "CAVOK": \.isCeilingAndVisibilityOK,
-                "COR": \.isCorrection,
-                "NOSIG": \.noSignificantChangesExpected
-            ]
             var components = metar.components(separatedBy: .whitespaces)
+
+            let flags = [
+                "AUTO": \METAR.isAutomatic,
+                "CAVOK": \.isCeilingAndVisibilityOK,
+                "COR": \.isCorrection
+            ]
             for (flag, keyPath) in flags {
                 self[keyPath: keyPath] = components.contains(flag)
                 components.removeAll { $0 == flag }
             }
 
             components.removeAll { $0.allSatisfy { $0 == "/" } }
+
             metar = components.joined(separator: " ")
         }
 
         // MARK: Runway Visual Range
 
-        for match in metar.matches(for: rvrRegularExpression).reversed() {
+        for match in metar.matches(for: #"\bR([0-9]{2}[L|C|R]?)\/([P|M]?)([0-9]{4})(?:V([P|M]?)([0-9]{4}))?(FT)?(?:/?(U|D|N))?\b"#).reversed() {
             guard let range = match[0], let runwayRange = match[1], let visibilityValue = match[3].flatMap({ Double(String(metar[$0])) }) else {
                 continue
             }
@@ -157,7 +133,6 @@ extension METAR {
                 return .init(modifier: variableVisibilityModifier, measurement: .init(value: value, unit: unit))
             }
 
-
             let trend: RunwayVisualRange.Trend?
             switch match[7].map({ metar[$0] }) {
             case "U":
@@ -177,7 +152,7 @@ extension METAR {
 
         // Runway Conditions
 
-        for match in metar.matches(for: runwayConditionRegularExpression).reversed() {
+        for match in metar.matches(for: #"R([0-9]{2}[L|C|R]?)\/(?:(?:([0-9]{1}|\/)([0-9]{1}|\/)([0-9]{2}|\/\/)|(CLRD))(?:([0-9]{2})|\/\/))"#).reversed() {
             guard let range = match[0] else { continue }
 
             let runwayDesignation: RunwayCondition.RunwayDesignation
@@ -335,7 +310,7 @@ extension METAR {
 
         // MARK: Military Colour Code
 
-        if let match = metar.matches(for: militaryColorCodeRegularExpression).first, let range = match[0], let colourRange = match[1] {
+        if let match = metar.matches(for: #"(?<!\S)(BLU|WHT|GRN|YLO1|YLO2|AMB|RED)\b"#).first, let range = match[0], let colourRange = match[1] {
             switch String(metar[colourRange]) {
             case "BLU":
                 militaryColorCode = .blue
@@ -359,7 +334,7 @@ extension METAR {
 
         // MARK: Wind
 
-        if let match = metar.matches(for: windRegularExpression).first, let directionString = match[1].map({ String(metar[$0]) }), let range = match[0], let conversionRange = match[4], let speedRange = match[2], let speed = Double(String(metar[speedRange])) {
+        if let match = metar.matches(for: #"(?<!\S)([0-9]{3}|VRB)([0-9]{2})(?:G(?:([0-9]{2})|//))?(KT|MPS|KPH)(?: ([0-9]{3})V([0-9]{3}))?\b"#).first, let directionString = match[1].map({ String(metar[$0]) }), let range = match[0], let conversionRange = match[4], let speedRange = match[2], let speed = Double(String(metar[speedRange])) {
 
             let direction: Wind.Direction
             switch directionString {
@@ -394,9 +369,23 @@ extension METAR {
             metar.removeSubrange(range)
         }
 
+        // MARK: Pressure
+
+        for match in metar.matches(for: #"(?<!\S)(?:(?:Q([0-9]{4}))|(?:A([0-9]{4})))\b"#).reversed() {
+            guard let range = match[0] else { continue }
+            let hPa = match[1].flatMap { Double(String(metar[$0])) }.map { Measurement(value: $0, unit: UnitPressure.hectopascals) }
+            let inHg = match[2].flatMap { Double(String(metar[$0])) }.map { Measurement(value: $0 / 100, unit: UnitPressure.inchesOfMercury) }
+            if qnh?.unit == .inchesOfMercury {
+                qnh = inHg ?? qnh
+            } else {
+                qnh = inHg ?? hPa ?? qnh
+            }
+            metar.removeSubrange(range)
+        }
+
         // MARK: Clouds
 
-        if let match = metar.matches(for: cloudsRegularExpression).first, let range = match[0], let cloudStringRange = match[1] {
+        if let match = metar.matches(for: #"(?<!\S)(SKC|CLR|NSC|NCD)\b"#).first, let range = match[0], let cloudStringRange = match[1] {
 
             switch metar[cloudStringRange] {
             case "SKC":
@@ -413,7 +402,7 @@ extension METAR {
 
             metar.removeSubrange(range)
         } else {
-            let cloudLayerMatches = metar.matches(for: cloudLayerRegularExpression)
+            let cloudLayerMatches = metar.matches(for: #"(?<!\S)(FEW|SCT|BKN|OVC|VV|///)([0-9]{3}|///)(?:///)?(CB|TCU|///)?"#)
 
             cloudLayers = cloudLayerMatches.compactMap { match in
 
@@ -475,7 +464,7 @@ extension METAR {
 
         // MARK: Temperatures
 
-        if let match = metar.matches(for: temperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], let rawTemperature = Double(String(metar[temperatureRange])) {
+        if let match = metar.matches(for: #"(?<!\S)(M)?([0-9]{2})/(?:(?:(M)?([0-9]{2}))|//)?"#).first, let range = match[0], let temperatureRange = match[2], let rawTemperature = Double(String(metar[temperatureRange])) {
 
             let temperatureIsNegative = match[1] != nil
             let temperature = rawTemperature * (temperatureIsNegative ? -1 : 1)
@@ -486,7 +475,7 @@ extension METAR {
             self.temperature = .init(value: temperature, unit: .celsius)
 
             metar.removeSubrange(range)
-        } else if let match = metar.matches(for: malformedTemperatureRegularExpression).first, let range = match[0], let temperatureRange = match[2], var temperature = Double(String(metar[temperatureRange])) {
+        } else if let match = metar.matches(for: #"(?<!\S)(M)?([0-9]{2})/ "#).first, let range = match[0], let temperatureRange = match[2], var temperature = Double(String(metar[temperatureRange])) {
             let temperatureIsNegative = match[1] != nil
             temperature *= (temperatureIsNegative ? -1 : 1)
             self.temperature = .init(value: temperature, unit: .celsius)
@@ -495,7 +484,7 @@ extension METAR {
 
         // MARK: Visibility
 
-        if let match = metar.matches(for: visibilityRegularExpression).first, let range = match[0] {
+        if let match = metar.matches(for: #"(?<!\S)(?:(M|P)?([0-9]{4}))(NDV)?\b"#).first, let range = match[0] {
 
             if let value = match[2].flatMap({ Double(String(metar[$0])) }) {
                 let modifier: Visibility.Modifier
@@ -515,7 +504,7 @@ extension METAR {
                 metar.removeSubrange(range)
             }
 
-        } else if let match = metar.matches(for: metricVisibilityRegularExpression).first, let range = match[0], let visibilityRange = match[2], let distance = Double(String(metar[visibilityRange])) {
+        } else if let match = metar.matches(for: #"(?<!\S)(M|P)?([0-9]+)(SM|KM)\b"#).first, let range = match[0], let visibilityRange = match[2], let distance = Double(String(metar[visibilityRange])) {
             let modifier: Visibility.Modifier
             switch match[1].map({ String(metar[$0]) }) {
             case "M":
@@ -534,7 +523,7 @@ extension METAR {
                 break
             }
             metar.removeSubrange(range)
-        } else if let match = metar.matches(for: metricFractionVisibilityRegularExpression).first, let range = match[0], let numeratorRange = match[3], let denominatorRange = match[4], let numerator = Double(String(metar[numeratorRange])), let denominator = Double(String(metar[denominatorRange])), denominator > 0 {
+        } else if let match = metar.matches(for: #"(?<!\S)(M|P)?(?:([0-9]+) )?([0-9]+)/([0-9]+)(SM|KM)\b"#).first, let range = match[0], let numeratorRange = match[3], let denominatorRange = match[4], let numerator = Double(String(metar[numeratorRange])), let denominator = Double(String(metar[denominatorRange])), denominator > 0 {
 
             let wholeNumber = match[2].flatMap { Double(String(metar[$0])) } ?? 0
 
@@ -562,7 +551,7 @@ extension METAR {
 
         // MARK: Directional Visibilities
 
-        for match in metar.matches(for: directionalVisibilityRegularExpression).reversed() {
+        for match in metar.matches(for: #"(?<!\S)(M|P)?([0-9]{4})(N|NE|E|SE|S|SW|W|NW)\b"#).reversed() {
             guard let range = match[0] else { continue }
             guard let visibility = match[2].flatMap({ Double(String(metar[$0])) }) else { continue }
 
@@ -605,9 +594,7 @@ extension METAR {
 
         // MARK: Weather
 
-        var weather = [Weather]()
-
-        for match in metar.matches(for: weatherRegularExpression).reversed() {
+        for match in metar.matches(for: #"(?<!\S)(-|\+|VC|RE)?([A-Z]{2})([A-Z]{2})?([A-Z]{2})?\b"#).reversed() {
             let modifier: Weather.Modifier
             switch match[1].map({ String(metar[$0]) }) {
             case "+":
@@ -706,25 +693,9 @@ extension METAR {
             }
 
             if let phenomena = parseWeatherStrings(weatherStrings), let range = match[0] {
-                weather.append(Weather(modifier: modifier, phenomena: phenomena))
+                weather.insert(.init(modifier: modifier, phenomena: phenomena), at: 0)
                 metar.removeSubrange(range)
             }
-        }
-
-        self.weather = weather.reversed()
-
-        // MARK: Pressure
-
-        for match in metar.matches(for: pressureRegularExpression).reversed() {
-            guard let range = match[0] else { continue }
-            let hPa = match[1].flatMap { Double(String(metar[$0])) }.map { Measurement(value: $0, unit: UnitPressure.hectopascals) }
-            let inHg = match[2].flatMap { Double(String(metar[$0])) }.map { Measurement(value: $0 / 100, unit: UnitPressure.inchesOfMercury) }
-            if qnh?.unit == .inchesOfMercury {
-                qnh = inHg ?? qnh
-            } else {
-                qnh = inHg ?? hPa ?? qnh
-            }
-            metar.removeSubrange(range)
         }
     }
 
@@ -732,7 +703,8 @@ extension METAR {
 
 private extension String {
 
-    func matches(for regularExpression: NSRegularExpression) -> [[Range<String.Index>?]] {
+    func matches(for regularExpression: String) -> [[Range<String.Index>?]] {
+        guard let regularExpression = try? NSRegularExpression(pattern: regularExpression) else { return [] }
         return regularExpression
             .matches(in: self, range: NSRange(location: 0, length: utf16.count))
             .map { result in (0..<result.numberOfRanges).map { Range(result.range(at: $0), in: self) } }

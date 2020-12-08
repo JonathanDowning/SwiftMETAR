@@ -27,7 +27,6 @@ public struct METAR: Hashable {
     public var isCeilingAndVisibilityOK = false
     public var isAutomatic = false
     public var isCorrection = false
-    public var noSignificantChangesExpected = false
     public var remarks: String?
 
 }
