@@ -123,6 +123,7 @@ final class METARTests: XCTestCase {
         try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z 00/M02")).temperature, .init(value: 0, unit: .celsius))
         try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z M00/M02")).temperature, .init(value: -0, unit: .celsius))
         try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z M00/M02")).temperature, .init(value: 0, unit: .celsius))
+        try XCTAssertEqual(XCTUnwrap(METAR("ABCD 012345Z M00/")).temperature, .init(value: 0, unit: .celsius))
     }
 
     func testCeilings() throws {
