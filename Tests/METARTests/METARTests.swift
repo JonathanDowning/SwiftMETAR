@@ -112,6 +112,9 @@ final class METARTests: XCTestCase {
         try XCTAssertEqual(XCTUnwrap(METAR("EKTE 211720Z AUTO 22011KT 9999NDV NCD 11/10 Q1026=")).isCeilingAndVisibilityOK, false)
         try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z 10SM")).isCeilingAndVisibilityOK, false)
         try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z 9999")).isCeilingAndVisibilityOK, false)
+        try XCTAssertEqual(XCTUnwrap(METAR("EGGD 121212Z P1/1 1/1SM")).visibility, .init(modifier: .greaterThan, measurement: .init(value: 2, unit: .miles)))
+        try XCTAssertNil(XCTUnwrap(METAR("EGGD 121212Z P1/0SM")).visibility)
+        try XCTAssertNil(XCTUnwrap(METAR("EGGD 121212Z P1 1/0SM")).visibility)
     }
 
     func testTemperatures() throws {

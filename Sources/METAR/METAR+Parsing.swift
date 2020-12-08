@@ -484,70 +484,58 @@ extension METAR {
 
         // MARK: Visibility
 
-        if let match = metar.matches(for: #"(?<!\S)(?:(M|P)?([0-9]{4}))(NDV)?\b"#).first, let range = match[0] {
+        func parseVisibility(_ metar: inout String) {
+            guard let match = metar.matches(for: #"(?<!\S)(P|M)?(?:(?:([0-9]{4})(NDV)?)|(?:([0-9]+)(?:\/([0-9]+))?(?: ([0-9]+)\/([0-9]+))?(KM|SM)))\b"#).first, let range = match[0] else {
+                return
+            }
 
-            if let value = match[2].flatMap({ Double(String(metar[$0])) }) {
-                let modifier: Visibility.Modifier
+            let modifier: Visibility.Modifier = {
                 switch match[1].map({ String(metar[$0]) }) {
                 case "M":
-                    modifier = .lessThan
+                    return .lessThan
                 case "P":
-                    modifier = .greaterThan
+                    return .greaterThan
                 default:
-                    modifier = .equalTo
+                    return .equalTo
                 }
+            }()
+
+            if let value = match[2].flatMap({ Double(String(metar[$0])) }) {
                 if value == 9999 {
                     visibility = .init(modifier: .greaterThan, measurement: .init(value: 10, unit: .kilometers))
                 } else {
-                    visibility = Visibility(modifier: modifier, measurement: .init(value: value, unit: .meters))
+                    visibility = .init(modifier: modifier, measurement: .init(value: value, unit: .meters))
                 }
-                metar.removeSubrange(range)
-            }
-
-        } else if let match = metar.matches(for: #"(?<!\S)(M|P)?([0-9]+)(SM|KM)\b"#).first, let range = match[0], let visibilityRange = match[2], let distance = Double(String(metar[visibilityRange])) {
-            let modifier: Visibility.Modifier
-            switch match[1].map({ String(metar[$0]) }) {
-            case "M":
-                modifier = .lessThan
-            case "P":
-                modifier = .greaterThan
-            default:
-                modifier = .equalTo
-            }
-            switch match[3].map({ metar[$0] }) {
-            case "KM":
-                visibility = Visibility(modifier: modifier, measurement: .init(value: distance, unit: .kilometers))
-            case "SM":
-                visibility = Visibility(modifier: modifier, measurement: .init(value: distance, unit: .miles))
-            default:
-                break
-            }
-            metar.removeSubrange(range)
-        } else if let match = metar.matches(for: #"(?<!\S)(M|P)?(?:([0-9]+) )?([0-9]+)/([0-9]+)(SM|KM)\b"#).first, let range = match[0], let numeratorRange = match[3], let denominatorRange = match[4], let numerator = Double(String(metar[numeratorRange])), let denominator = Double(String(metar[denominatorRange])), denominator > 0 {
-
-            let wholeNumber = match[2].flatMap { Double(String(metar[$0])) } ?? 0
-
-            let modifier: Visibility.Modifier
-            switch match[1].map({ String(metar[$0]) }) {
-            case "M":
-                modifier = .lessThan
-            case "P":
-                modifier = .greaterThan
-            default:
-                modifier = .equalTo
-            }
-
-            switch match[5].map({ metar[$0] }) {
-            case "KM":
-                visibility = .init(modifier: modifier, measurement: .init(value: numerator / denominator + wholeNumber, unit: .kilometers))
-            case "SM":
-                visibility = .init(modifier: modifier, measurement: .init(value: numerator / denominator + wholeNumber, unit: .miles))
-            default:
-                break
+            } else if var value = match[4].flatMap({ Double(String(metar[$0])) }) {
+                if let denominator = match[5].flatMap({ Double(String(metar[$0])) }) {
+                    if denominator == 0 {
+                        return
+                    } else {
+                        value /= denominator
+                    }
+                }
+                if let numerator = match[6].flatMap({ Double(String(metar[$0])) }), let denominator = match[7].flatMap({ Double(String(metar[$0])) }) {
+                    if denominator == 0 {
+                        return
+                    } else {
+                        value += numerator / denominator
+                    }
+                }
+                let unit: UnitLength
+                switch match[8].map({ metar[$0] }) {
+                case "KM":
+                    unit = .kilometers
+                case "SM":
+                    unit = .miles
+                default:
+                    return
+                }
+                visibility = .init(modifier: modifier, measurement: .init(value: value, unit: unit))
             }
 
             metar.removeSubrange(range)
         }
+        parseVisibility(&metar)
 
         // MARK: Directional Visibilities
 
