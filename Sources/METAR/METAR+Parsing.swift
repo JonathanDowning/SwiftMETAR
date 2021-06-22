@@ -14,7 +14,11 @@ extension METAR {
     }
 
     private init?(metarString: String, identifier: String? = nil) {
-        var metar = metarString
+        let components = metarString.components(separatedBy: .newlines)
+
+        guard components.count == 1 else { return nil }
+
+        var metar = components[0].trimmingCharacters(in: .whitespaces)
 
         // MARK: Remarks
 
@@ -25,20 +29,13 @@ extension METAR {
             self.remarks = remarks.isEmpty ? nil : remarks
         }
 
-        // MARK: ICAO
+        // MARK: ICAO / Date
 
         if let identifier = identifier {
             self.identifier = identifier
-        } else if let match = metar.matches(for: #"(.*?)([A-Z0-9]{4})\b"#).first, let range = match[0], let identifierRange = match[2] {
+        } else if let match = metar.matches(for: #"^([A-Z0-9]{4}) ([0-9]{2})([0-9]{2})([0-9]{2})Z\b"#).first, let range = match[0], let identifierRange = match[1], let timeZone = TimeZone(identifier: "UTC"), let dayRange = match[2], let hourRange = match[3], let minuteRange = match[4], let day = Int(String(metar[dayRange])), let hour = Int(String(metar[hourRange])), let minute = Int(String(metar[minuteRange])) {
             self.identifier = String(metar[identifierRange])
-            metar.removeSubrange(range)
-        } else {
-            return nil
-        }
 
-        // MARK: Date
-
-        if let match = metar.matches(for: #"(?<!\S)([0-9]{2})([0-9]{2})([0-9]{2})Z\b"#).first, let timeZone = TimeZone(identifier: "UTC"), let dateStringRange = match[0], let dayRange = match[1], let hourRange = match[2], let minuteRange = match[3], let day = Int(String(metar[dayRange])), let hour = Int(String(metar[hourRange])), let minute = Int(String(metar[minuteRange])) {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
 
@@ -47,8 +44,9 @@ extension METAR {
             self.dateComponents.hour = hour
             self.dateComponents.minute = minute
 
-            metar.removeSubrange(dateStringRange)
-        } else if identifier == nil {
+            metar.removeSubrange(range)
+            metar = metar.trimmingCharacters(in: .whitespaces)
+        } else {
             return nil
         }
 
@@ -693,7 +691,7 @@ extension METAR {
 private extension String {
 
     func matches(for regularExpression: String) -> [[Range<String.Index>?]] {
-        guard let regularExpression = try? NSRegularExpression(pattern: regularExpression) else { return [] }
+        guard let regularExpression = try? NSRegularExpression(pattern: regularExpression, options: .anchorsMatchLines) else { return [] }
         return regularExpression
             .matches(in: self, range: NSRange(location: 0, length: utf16.count))
             .map { result in (0..<result.numberOfRanges).map { Range(result.range(at: $0), in: self) } }
