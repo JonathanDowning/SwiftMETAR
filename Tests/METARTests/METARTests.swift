@@ -4,7 +4,7 @@ import XCTest
 final class METARTests: XCTestCase {
 
     func testValidMETARs() throws {
-        try compareMETAR("KRDU COR 281151Z AUTO 22007KT 9SM SCT040TCU FEW080 FEW250 22/20 SHRA BLU A3004 NOSIG RMK AO2 SLP166 60000 T02170200 10222 20206 53022", "KRDU", 28, 11, 51, wind: Wind(direction: .direction(.init(value: 220, unit: .degrees)), speed: .init(value: 7, unit: .knots)), qnh: .init(value: 30.04, unit: .inchesOfMercury), cloudLayers: [.init(coverage: .scattered, height: .init(value: 4000, unit: .feet), significantCloudType: .toweringCumulus), .init(coverage: .few, height: .init(value: 8000, unit: .feet)), .init(coverage: .few, height: .init(value: 25000, unit: .feet))], visibility: .init(measurement: .init(value: 9, unit: .miles)), weather: [Weather(phenomena: [.showers, .rain])], trends: [.noSignificantChangeExpected], militaryColorCode: .blue, temperature: 22, dewPoint: 20, automaticStation: true, correction: true, remarks: "AO2 SLP166 60000 T02170200 10222 20206 53022", noaaFlightRules: .vfr)
+        try compareMETAR("KRDU 281151Z COR AUTO 22007KT 9SM SCT040TCU FEW080 FEW250 22/20 SHRA BLU A3004 NOSIG RMK AO2 SLP166 60000 T02170200 10222 20206 53022", "KRDU", 28, 11, 51, wind: Wind(direction: .direction(.init(value: 220, unit: .degrees)), speed: .init(value: 7, unit: .knots)), qnh: .init(value: 30.04, unit: .inchesOfMercury), cloudLayers: [.init(coverage: .scattered, height: .init(value: 4000, unit: .feet), significantCloudType: .toweringCumulus), .init(coverage: .few, height: .init(value: 8000, unit: .feet)), .init(coverage: .few, height: .init(value: 25000, unit: .feet))], visibility: .init(measurement: .init(value: 9, unit: .miles)), weather: [Weather(phenomena: [.showers, .rain])], trends: [.noSignificantChangeExpected], militaryColorCode: .blue, temperature: 22, dewPoint: 20, automaticStation: true, correction: true, remarks: "AO2 SLP166 60000 T02170200 10222 20206 53022", noaaFlightRules: .vfr)
         try compareMETAR("EGGD 121212Z ///010 10SM", "EGGD", 12, 12, 12, cloudLayers: [.init(coverage: .notReported, height: .init(value: 1000, unit: .feet))], visibility: .init(measurement: .init(value: 10, unit: .miles)), noaaFlightRules: .vfr)
         try compareMETAR("PGUA 160631Z 33024G55KT 0SM +RA VV000 23/22 A2891 RESHRA RMK WR//=", "PGUA", 16, 6, 31, wind: Wind(direction: .direction(.init(value: 330, unit: .degrees)), speed: .init(value: 24, unit: .knots), gustSpeed: .init(value: 55, unit: .knots)), qnh: .init(value: 28.91, unit: .inchesOfMercury), cloudLayers: [.init(coverage: .skyObscured, height: .init(value: 0, unit: .feet))], visibility: .init(measurement: .init(value: 0, unit: .miles)), weather: [.init(modifier: .heavy, phenomena: [.rain]), .init(modifier: .recent, phenomena: [.showers, .rain])], temperature: 23, dewPoint: 22, remarks: "WR//=", noaaFlightRules: .lifr)
         try compareMETAR("EGGD 251250Z AUTO 25016G27KT 220V280 9999 BKN019///TCU 11/11 VCFG Q1013", "EGGD", 25, 12, 50, wind: Wind(direction: .direction(.init(value: 250, unit: .degrees)), speed: .init(value: 16, unit: .knots), gustSpeed: .init(value: 27, unit: .knots), variation: .init(from: .init(value: 220, unit: .degrees), to: .init(value: 280, unit: .degrees))),qnh: .init(value: 1013, unit: .hectopascals), cloudLayers: [.init(coverage: .broken, height: .init(value: 1900, unit: .feet), significantCloudType: .toweringCumulus)], visibility: .init(modifier: .greaterThan, measurement: .init(value: 10, unit: .kilometers)), weather: [.init(modifier: .inTheVicinity, phenomena: [.fog])], temperature: 11, dewPoint: 11, automaticStation: true, noaaFlightRules: .mvfr)
@@ -55,7 +55,22 @@ final class METARTests: XCTestCase {
         XCTAssertNil(METAR("RDU 012345Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
         XCTAssertNil(METAR("KRDU 12345Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
         XCTAssertNil(METAR("KRDU 0123456Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+        XCTAssertNil(METAR("KRDU AUTO 0123456Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+        XCTAssertNil(METAR("KRDU COR 0123456Z 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
         XCTAssertNil(METAR("KRDU 012345 22007KT 9SM FEW080 FEW250 22/20 A3004 RMK AO2 SLP166 60000 T02170200 10222 20206 53022"))
+    }
+
+    func testCSVResponse() {
+        let response = """
+        No errors
+        No warnings
+        5 ms
+        data source=metars
+        1 results
+        raw_text,station_id,observation_time,latitude,longitude,temp_c,dewpoint_c,wind_dir_degrees,wind_speed_kt,wind_gust_kt,visibility_statute_mi,altim_in_hg,sea_level_pressure_mb,corrected,auto,auto_station,maintenance_indicator_on,no_signal,lightning_sensor_off,freezing_rain_sensor_off,present_weather_sensor_off,wx_string,sky_cover,cloud_base_ft_agl,sky_cover,cloud_base_ft_agl,sky_cover,cloud_base_ft_agl,sky_cover,cloud_base_ft_agl,flight_category,three_hr_pressure_tendency_mb,maxT_c,minT_c,maxT24hr_c,minT24hr_c,precip_in,pcp3hr_in,pcp6hr_in,pcp24hr_in,snow_in,vert_vis_ft,metar_type,elevation_m
+        KSEA 222053Z 24007KT 210V270 10SM FEW030 FEW200 23/14 A2987 RMK AO2 SLP119 T02280144 58008,KSEA,2021-06-22T20:53:00Z,47.45,-122.32,22.8,14.4,240,7,,10.0,29.870079,1011.9,,,TRUE,,,,,,,FEW,3000,FEW,20000,,,,,VFR,-0.8,,,,,,,,,,,METAR,115.0
+        """
+        XCTAssertNil(METAR(response))
     }
 
     func testICAOFlightRules() throws {
