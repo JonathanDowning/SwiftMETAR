@@ -2,6 +2,10 @@
 
 SwiftMETAR provides a simple way to parse METARs into Swift types.
 
+## This Project Has Been Archived
+
+This project is not under active development and has been archived.
+
 ## Usage Example
 
 ``` swift
